@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -333,8 +334,12 @@ func (pw *progressWriter) Write(p []byte) (int, error) {
 }
 
 func downloadFileWithProgress(url string, destPath string, compName string) error {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
 	client := &http.Client{
-		Timeout: 30 * time.Minute,
+		Transport: tr,
+		Timeout:   30 * time.Minute,
 	}
 
 	req, err := http.NewRequest("GET", url, nil)

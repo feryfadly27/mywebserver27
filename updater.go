@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -78,7 +79,13 @@ func CheckForUpdates(repo string, token string) (*UpdateCheckResult, error) {
 		req.Header.Set("Authorization", "token "+token)
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   15 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("gagal terhubung ke GitHub: %w", err)
@@ -247,7 +254,13 @@ func ApplySelfUpdate(downloadURL string, token string) error {
 		req.Header.Set("Authorization", "token "+token)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Minute}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   5 * time.Minute,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("gagal mengunduh file rilis: %w", err)
