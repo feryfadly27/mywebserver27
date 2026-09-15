@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -145,7 +146,16 @@ func main() {
 		os.Exit(0)
 	}()
 
-	panelURL := fmt.Sprintf("http://localhost:%d", settings.PanelPort)
+	panelPort := settings.PanelPort
+	if settings.AutoPortFallback {
+		freePort, shifted := FindAvailablePort(panelPort, 50)
+		if shifted {
+			log.Printf("⚠️ Port %d is in use. Control Panel automatically switched to port: %d", panelPort, freePort)
+			panelPort = freePort
+		}
+	}
+
+	panelURL := fmt.Sprintf("http://localhost:%d", panelPort)
 	log.Printf("🌐 Control Panel running at: %s", panelURL)
 
 	// Open browser
@@ -156,12 +166,16 @@ func main() {
 		}()
 	}
 
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", panelPort))
+	if err != nil {
+		log.Fatalf("HTTP Server error: %v", err)
+	}
+
 	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", settings.PanelPort),
 		Handler: mux,
 	}
 
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("HTTP Server error: %v", err)
 	}
 }

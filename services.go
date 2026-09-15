@@ -22,7 +22,7 @@ type ServiceStatus struct {
 }
 
 type ServicesManager struct {
-	lock         sync.Mutex
+	lock         sync.RWMutex
 	apacheCmd    *exec.Cmd
 	apacheStart  time.Time
 	mariadbCmd   *exec.Cmd
@@ -32,12 +32,31 @@ type ServicesManager struct {
 var Manager = &ServicesManager{}
 
 func (sm *ServicesManager) IsPortOpen(port int) bool {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 400*time.Millisecond)
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 200*time.Millisecond)
 	if err == nil {
 		conn.Close()
 		return true
 	}
 	return false
+}
+
+// FindAvailablePort tests if startPort is free. If occupied, it scans up to maxScan ports.
+// Returns (availablePort, wasFallbackUsed).
+func FindAvailablePort(startPort int, maxScan int) (int, bool) {
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", startPort))
+	if err == nil {
+		_ = ln.Close()
+		return startPort, false
+	}
+
+	for p := startPort + 1; p < startPort+maxScan; p++ {
+		testLn, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p))
+		if err == nil {
+			_ = testLn.Close()
+			return p, true
+		}
+	}
+	return startPort, false
 }
 
 func (sm *ServicesManager) StartApache() error {
@@ -57,7 +76,17 @@ func (sm *ServicesManager) StartApache() error {
 		KillByName("httpd")
 		time.Sleep(300 * time.Millisecond)
 		if sm.IsPortOpen(settings.ApachePort) {
-			return fmt.Errorf("Port %d is already in use by another application. Please close the conflicting application or change Apache port in Settings.", settings.ApachePort)
+			if settings.AutoPortFallback {
+				freePort, shifted := FindAvailablePort(settings.ApachePort, 50)
+				if shifted {
+					settings.ApachePort = freePort
+					_ = SaveSettings(settings)
+				} else {
+					return fmt.Errorf("Port %d is in use by another application and no free port was found.", settings.ApachePort)
+				}
+			} else {
+				return fmt.Errorf("Port %d is already in use by another application. Please close the conflicting application or change Apache port in Settings.", settings.ApachePort)
+			}
 		}
 	}
 
@@ -126,9 +155,7 @@ func (sm *ServicesManager) StartApache() error {
 
 	// Brief wait to ensure Apache hasn't crashed on boot
 	time.Sleep(500 * time.Millisecond)
-	sm.lock.Lock()
 	isExited := (sm.apacheCmd == nil)
-	sm.lock.Unlock()
 
 	if isExited {
 		logBytes, _ := os.ReadFile(filepath.Join(logsDir, "apache_runner.log"))
@@ -201,7 +228,17 @@ func (sm *ServicesManager) StartMariaDB() error {
 		KillByName("mysqld")
 		time.Sleep(400 * time.Millisecond)
 		if sm.IsPortOpen(settings.MariaDBPort) {
-			return fmt.Errorf("Port %d is already in use by another application. Please close the conflicting application or change MariaDB port in Settings.", settings.MariaDBPort)
+			if settings.AutoPortFallback {
+				freePort, shifted := FindAvailablePort(settings.MariaDBPort, 50)
+				if shifted {
+					settings.MariaDBPort = freePort
+					_ = SaveSettings(settings)
+				} else {
+					return fmt.Errorf("Port %d is in use by another application and no free port was found.", settings.MariaDBPort)
+				}
+			} else {
+				return fmt.Errorf("Port %d is already in use by another application. Please close the conflicting application or change MariaDB port in Settings.", settings.MariaDBPort)
+			}
 		}
 	}
 
@@ -254,9 +291,7 @@ func (sm *ServicesManager) StartMariaDB() error {
 
 	// Brief wait to ensure MariaDB hasn't crashed on boot
 	time.Sleep(600 * time.Millisecond)
-	sm.lock.Lock()
 	isExited := (sm.mariadbCmd == nil)
-	sm.lock.Unlock()
 
 	if isExited {
 		logBytes, _ := os.ReadFile(filepath.Join(logsDir, "mariadb_runner.log"))
@@ -324,8 +359,8 @@ func (sm *ServicesManager) StopAll() {
 }
 
 func (sm *ServicesManager) GetStatus() map[string]ServiceStatus {
-	sm.lock.Lock()
-	defer sm.lock.Unlock()
+	sm.lock.RLock()
+	defer sm.lock.RUnlock()
 
 	settings := GetCurrentSettings()
 	result := make(map[string]ServiceStatus)

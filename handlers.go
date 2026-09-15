@@ -150,6 +150,13 @@ func HandleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 
 		oldSettings := GetCurrentSettings()
+		if newSettings.PanelPort == 0 {
+			newSettings.PanelPort = oldSettings.PanelPort
+		}
+		if newSettings.VirtualHosts == nil {
+			newSettings.VirtualHosts = oldSettings.VirtualHosts
+		}
+
 		if err := SaveSettings(newSettings); err != nil {
 			jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: "Failed to save settings: " + err.Error()})
 			return

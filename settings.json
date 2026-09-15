@@ -3,7 +3,10 @@
   "mariadb_port": 3307,
   "panel_port": 3000,
   "auto_start": true,
+  "auto_port_fallback": true,
   "shell": "cmd",
+  "github_repo": "feryfadly27/mywebserver27",
+  "auto_check_update": false,
   "virtual_hosts": [
     {
       "domain": "kasir.test",

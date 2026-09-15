@@ -21,11 +21,19 @@ function initApp() {
     setInterval(fetchStatus, 3000);
 }
 
+let statusFailCount = 0;
+
 async function fetchStatus() {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
     try {
-        const res = await fetch('/api/status');
+        const res = await fetch('/api/status', { signal: controller.signal });
+        clearTimeout(timeoutId);
         const data = await res.json();
         if (!data.success) return;
+
+        statusFailCount = 0; // reset on success
 
         const info = data.data;
         currentSettings = info.settings;
@@ -58,7 +66,28 @@ async function fetchStatus() {
             checkForUpdates(false);
         }
     } catch (err) {
-        console.error('Error fetching server status:', err);
+        clearTimeout(timeoutId);
+        statusFailCount++;
+        // If server is unreachable for >= 2 cycles, indicate offline state gracefully
+        if (statusFailCount >= 2) {
+            handleServerOffline();
+        }
+    }
+}
+
+function handleServerOffline() {
+    const dotAp = document.getElementById('dotApache');
+    const statusAp = document.getElementById('statusApache');
+    const dotDb = document.getElementById('dotMariaDB');
+    const statusDb = document.getElementById('statusMariaDB');
+
+    if (dotAp && dotAp.parentElement) {
+        dotAp.parentElement.className = 'status-indicator-pill offline';
+        if (statusAp) statusAp.textContent = 'Server Offline';
+    }
+    if (dotDb && dotDb.parentElement) {
+        dotDb.parentElement.className = 'status-indicator-pill offline';
+        if (statusDb) statusDb.textContent = 'Server Offline';
     }
 }
 
@@ -200,6 +229,8 @@ function setupEventListeners() {
         document.getElementById('inputApachePort').value = currentSettings.apache_port;
         document.getElementById('inputMariaDBPort').value = currentSettings.mariadb_port;
         document.getElementById('inputAutoStart').checked = currentSettings.auto_start;
+        const fallbackEl = document.getElementById('inputAutoPortFallback');
+        if (fallbackEl) fallbackEl.checked = currentSettings.auto_port_fallback !== false;
         document.getElementById('inputGitHubRepo').value = currentSettings.github_repo || 'feryfadly27/mywebserver27';
         document.getElementById('inputGitHubToken').value = currentSettings.github_token || '';
         document.getElementById('inputAutoCheckUpdate').checked = currentSettings.auto_check_update !== false;
@@ -231,6 +262,7 @@ function setupEventListeners() {
         const apachePort = parseInt(document.getElementById('inputApachePort').value, 10);
         const mariadbPort = parseInt(document.getElementById('inputMariaDBPort').value, 10);
         const autoStart = document.getElementById('inputAutoStart').checked;
+        const autoPortFallback = document.getElementById('inputAutoPortFallback') ? document.getElementById('inputAutoPortFallback').checked : true;
         const shell = document.querySelector('input[name="shell"]:checked').value;
         const githubRepo = document.getElementById('inputGitHubRepo').value.trim();
         const githubToken = document.getElementById('inputGitHubToken').value.trim();
@@ -244,6 +276,7 @@ function setupEventListeners() {
                     apache_port: apachePort,
                     mariadb_port: mariadbPort,
                     auto_start: autoStart,
+                    auto_port_fallback: autoPortFallback,
                     shell: shell,
                     github_repo: githubRepo,
                     github_token: githubToken,
