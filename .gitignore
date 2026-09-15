@@ -1,11 +1,10 @@
-# Binaries
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
+# Server packages (downloaded automatically on setup)
 bin/
-dist/
+
+# Temporary update files
+*.old
+*.download
+*.exe~
 
 # Runtime data & logs
 data/
