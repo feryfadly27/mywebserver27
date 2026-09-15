@@ -1,0 +1,15 @@
+{
+  "apache_port": 8080,
+  "mariadb_port": 3307,
+  "panel_port": 3000,
+  "auto_start": true,
+  "shell": "cmd",
+  "virtual_hosts": [
+    {
+      "domain": "kasir.test",
+      "folder": "kasir-app",
+      "document_root": "C:\\Users\\Fery\\Documents\\Project\\webserver\\www\\htdocs\\kasir-app",
+      "enabled": true
+    }
+  ]
+}

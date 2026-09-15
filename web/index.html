@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyLokalWebserver</title>
+    <link rel="stylesheet" href="/style.css">
+    <!-- xterm.js CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.min.js"></script>
+</head>
+<body>
+    <div class="layout">
+        <!-- Top Navigation -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <div class="app-brand">
+                    <div class="app-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                        </svg>
+                    </div>
+                    <div class="app-title-group">
+                        <span class="app-title">MyLokalWebserver</span>
+                        <span class="app-version">v1.0 &bull; Portable</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="topbar-right">
+                <button id="btnOpenNativeTerminalTop" class="btn btn-default" title="Buka terminal bawaan Windows di folder htdocs">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="4 17 10 11 4 5"></polyline>
+                        <line x1="12" y1="19" x2="20" y2="19"></line>
+                    </svg>
+                    <span>Terminal Windows</span>
+                </button>
+                <button id="btnOpenHtdocs" class="btn btn-default" title="Buka folder www/htdocs di Explorer">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Folder htdocs</span>
+                </button>
+                <button id="btnSettings" class="btn btn-default btn-icon-only" title="Pengaturan Port & Shell">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </button>
+                <button id="btnShutdown" class="btn btn-danger-ghost" title="Matikan Apache, MariaDB, dan matikan MyLokalWebserver">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                        <line x1="12" y1="2" x2="12" y2="12"></line>
+                    </svg>
+                    <span>Matikan Server</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Setup Screen (when binaries not yet downloaded) -->
+        <section id="setupSection" class="panel setup-panel hidden">
+            <div class="setup-intro">
+                <h2>Paket Server Belum Terpasang</h2>
+                <p>Klik tombol unduh untuk memasang Apache 2.4, PHP 8.4, MariaDB 11.4, dan phpMyAdmin secara otomatis.</p>
+            </div>
+
+            <div class="setup-grid">
+                <div class="setup-item">
+                    <div class="setup-item-body">
+                        <strong>Apache HTTP Server 2.4</strong>
+                        <span>Web server utama</span>
+                    </div>
+                    <span id="badge-apache" class="tag tag-neutral">Menunggu</span>
+                </div>
+                <div class="setup-item">
+                    <div class="setup-item-body">
+                        <strong>PHP 8.4 TS</strong>
+                        <span>Ekstensi mysqli & PDO MySQL</span>
+                    </div>
+                    <span id="badge-php" class="tag tag-neutral">Menunggu</span>
+                </div>
+                <div class="setup-item">
+                    <div class="setup-item-body">
+                        <strong>MariaDB 11.4 LTS</strong>
+                        <span>Database Server</span>
+                    </div>
+                    <span id="badge-mariadb" class="tag tag-neutral">Menunggu</span>
+                </div>
+                <div class="setup-item">
+                    <div class="setup-item-body">
+                        <strong>phpMyAdmin 5.2</strong>
+                        <span>Database Web GUI</span>
+                    </div>
+                    <span id="badge-phpmyadmin" class="tag tag-neutral">Menunggu</span>
+                </div>
+            </div>
+
+            <div id="downloadProgressContainer" class="progress-wrapper hidden">
+                <div class="progress-bar-track">
+                    <div id="downloadProgressBar" class="progress-bar-thumb" style="width: 0%"></div>
+                </div>
+                <div class="progress-meta">
+                    <span id="downloadStatusText">Mempersiapkan unduhan...</span>
+                    <span id="downloadPercent">0%</span>
+                </div>
+            </div>
+
+            <div class="setup-footer">
+                <button id="btnStartDownload" class="btn btn-primary btn-lg">
+                    Unduh & Pasang Otomatis
+                </button>
+            </div>
+        </section>
+
+        <!-- Main Dashboard -->
+        <main id="dashboardSection" class="dashboard">
+            <!-- Services Action Header -->
+            <div class="services-header-bar">
+                <div class="section-title" style="margin-bottom: 0;">Status Layanan & Komponen</div>
+                <div class="services-quick-actions">
+                    <button type="button" id="btnStartAllServices" class="btn btn-subtle btn-xs" title="Nyalakan Apache & MariaDB">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        <span>Nyalakan Semua</span>
+                    </button>
+                    <button type="button" id="btnStopAllServices" class="btn btn-subtle btn-xs" title="Hentikan Apache & MariaDB">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect></svg>
+                        <span>Hentikan Semua</span>
+                    </button>
+                    <button type="button" id="btnRestartAllServices" class="btn btn-subtle btn-xs" title="Mulai ulang Apache & MariaDB">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>Restart Semua</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Services Overview -->
+            <div class="services-grid">
+                <!-- Apache Service Box -->
+                <div class="service-card" id="cardApache">
+                    <div class="service-card-head">
+                        <div class="service-meta">
+                            <span class="service-name">Apache Web Server</span>
+                            <span class="service-sub">PHP 8.4 Module</span>
+                        </div>
+                        <div class="service-status">
+                            <span class="status-indicator-pill" id="indPillApache">
+                                <span class="status-indicator-dot" id="dotApache"></span>
+                                <span id="statusApache">Checking</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="service-metrics">
+                        <div class="metric">
+                            <span class="metric-label">Port</span>
+                            <span class="metric-value font-mono" id="valApachePort">8080</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">PID</span>
+                            <span class="metric-value font-mono" id="valApachePid">-</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Uptime</span>
+                            <span class="metric-value font-mono" id="valApacheUptime">-</span>
+                        </div>
+                    </div>
+
+                    <div class="service-card-actions">
+                        <button id="btnToggleApache" class="btn btn-default btn-action">Start</button>
+                        <button id="btnRestartApache" class="btn btn-subtle">Restart</button>
+                    </div>
+                </div>
+
+                <!-- MariaDB Service Box -->
+                <div class="service-card" id="cardMariaDB">
+                    <div class="service-card-head">
+                        <div class="service-meta">
+                            <span class="service-name">MariaDB Database</span>
+                            <span class="service-sub">MySQL Compatible</span>
+                        </div>
+                        <div class="service-status">
+                            <span class="status-indicator-pill" id="indPillMariaDB">
+                                <span class="status-indicator-dot" id="dotMariaDB"></span>
+                                <span id="statusMariaDB">Checking</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="service-metrics">
+                        <div class="metric">
+                            <span class="metric-label">Port</span>
+                            <span class="metric-value font-mono" id="valMariaDBPort">3307</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">PID</span>
+                            <span class="metric-value font-mono" id="valMariaDBPid">-</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Uptime</span>
+                            <span class="metric-value font-mono" id="valMariaDBUptime">-</span>
+                        </div>
+                    </div>
+
+                    <div class="service-card-actions">
+                        <button id="btnToggleMariaDB" class="btn btn-default btn-action">Start</button>
+                        <button id="btnRestartMariaDB" class="btn btn-subtle">Restart</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Access Links -->
+            <div class="quick-links-panel">
+                <div class="section-title">Akses Layanan & Alat</div>
+                <div class="quick-links-grid">
+                    <a id="linkWebsite" href="http://localhost:8080" target="_blank" class="access-tile">
+                        <div class="access-tile-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="2" y1="12" x2="22" y2="12"></line>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                        </div>
+                        <div class="access-tile-info">
+                            <strong>Website Lokal</strong>
+                            <span id="textWebsiteUrl" class="font-mono">http://localhost:8080</span>
+                        </div>
+                        <div class="access-tile-arrow">&rarr;</div>
+                    </a>
+
+                    <a id="linkPhpMyAdmin" href="http://localhost:8080/phpmyadmin" target="_blank" class="access-tile">
+                        <div class="access-tile-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                            </svg>
+                        </div>
+                        <div class="access-tile-info">
+                            <strong>phpMyAdmin</strong>
+                            <span>Manajemen Basis Data</span>
+                        </div>
+                        <div class="access-tile-arrow">&rarr;</div>
+                    </a>
+
+                    <button id="btnOpenNativeTerminalTile" class="access-tile access-tile-button" title="Buka terminal bawaan CMD / PowerShell di folder www/htdocs">
+                        <div class="access-tile-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="4 17 10 11 4 5"></polyline>
+                                <line x1="12" y1="19" x2="20" y2="19"></line>
+                            </svg>
+                        </div>
+                        <div class="access-tile-info">
+                            <strong>Terminal Windows</strong>
+                            <span>Jendela Luar (CMD/PWSH)</span>
+                        </div>
+                        <div class="access-tile-arrow">&rarr;</div>
+                    </button>
+
+                    <button id="btnOpenLogs" class="access-tile access-tile-button">
+                        <div class="access-tile-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                        </div>
+                        <div class="access-tile-info">
+                            <strong>Berkas Log</strong>
+                            <span>Error & Access Logs</span>
+                        </div>
+                        <div class="access-tile-arrow">&rarr;</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Projects & Virtual Hosts Section -->
+            <div class="projects-section">
+                <div class="section-head-bar">
+                    <div class="section-head-info">
+                        <div class="section-title">Proyek & Virtual Host</div>
+                        <div class="section-subtitle">Otomatis mendeteksi folder di <code>www/htdocs</code> (PHP Native, Laravel, CI4, WP)</div>
+                    </div>
+                    <div class="section-head-actions">
+                        <button id="btnNewProject" class="btn btn-default" title="Buat folder proyek PHP baru">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            <span>Proyek Baru</span>
+                        </button>
+                        <button id="btnAddVHost" class="btn btn-default" title="Tambah Virtual Host domain kustom (.test)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="2" y1="12" x2="22" y2="12"></line>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                            <span>Domain (.test)</span>
+                        </button>
+                        <button id="btnHostsHelper" class="btn btn-subtle" title="Panduan domain lokal di Windows">
+                            <span>Info Hosts</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Projects List Container -->
+                <div id="projectsList" class="projects-list-container">
+                    <!-- Populated dynamically by app.js -->
+                </div>
+            </div>
+
+            <!-- Terminal Workstation -->
+            <div class="terminal-wrapper">
+                <div class="terminal-bar">
+                    <div class="terminal-bar-left">
+                        <div class="terminal-window-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <span class="terminal-bar-title font-mono">www/htdocs</span>
+                    </div>
+                    <div class="terminal-bar-right">
+                        <button id="btnPopoutTerminal" class="btn-term" title="Buka terminal bawaan di jendela luar">Buka di CMD ↗</button>
+                        <button id="btnClearTerminal" class="btn-term" title="Bersihkan layar">Clear</button>
+                        <button id="btnReconnectTerminal" class="btn-term" title="Mulai ulang sesi terminal">Reconnect</button>
+                    </div>
+                </div>
+                <div id="terminalContainer" class="terminal-view"></div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Created by <strong>Fery Fadly</strong> and <strong>Team Dikodein</strong></p>
+        </footer>
+    </div>
+
+    <!-- Settings Dialog -->
+    <div id="settingsModal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3>Pengaturan Server</h3>
+                <button id="btnCloseSettings" class="modal-close" aria-label="Tutup">&times;</button>
+            </div>
+            <form id="settingsForm" class="modal-form">
+                <div class="form-row">
+                    <label for="inputApachePort">Port Apache Web Server</label>
+                    <input type="number" id="inputApachePort" min="80" max="65535" required class="form-input font-mono">
+                    <span class="form-hint">Port standar: 80 atau 8080</span>
+                </div>
+
+                <div class="form-row">
+                    <label for="inputMariaDBPort">Port MariaDB Database</label>
+                    <input type="number" id="inputMariaDBPort" min="1" max="65535" required class="form-input font-mono">
+                    <span class="form-hint">Port bawaan: 3307 (hindari 3306 jika ada MySQL lain)</span>
+                </div>
+
+                <div class="form-row">
+                    <label>Shell Terminal</label>
+                    <div class="segmented-control">
+                        <label class="segment">
+                            <input type="radio" name="shell" value="cmd" checked>
+                            <span>Command Prompt (CMD)</span>
+                        </label>
+                        <label class="segment">
+                            <input type="radio" name="shell" value="powershell">
+                            <span>PowerShell</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-row form-row-checkbox">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="inputAutoStart" checked>
+                        <span>Otomatis jalankan Apache & MariaDB saat aplikasi dibuka</span>
+                    </label>
+                </div>
+
+                <div id="settingsAlert" class="modal-alert hidden"></div>
+
+                <div class="modal-actions">
+                    <button type="button" id="btnCancelSettings" class="btn btn-subtle">Batal</button>
+                    <button type="submit" id="btnSaveSettings" class="btn btn-primary">Simpan Konfigurasi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- New Project Modal -->
+    <div id="newProjectModal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3>Buat Proyek PHP Baru</h3>
+                <button id="btnCloseNewProject" class="modal-close" aria-label="Tutup">&times;</button>
+            </div>
+            <form id="newProjectForm" class="modal-form">
+                <div class="form-row">
+                    <label for="inputProjectName">Nama Folder Proyek</label>
+                    <input type="text" id="inputProjectName" placeholder="contoh: kasir-online" required class="form-input font-mono">
+                    <span class="form-hint">Folder akan dibuat di <code>www/htdocs/nama-proyek</code></span>
+                </div>
+
+                <div class="form-row">
+                    <label>Struktur Folder Awal</label>
+                    <div class="segmented-control">
+                        <label class="segment">
+                            <input type="radio" name="projectType" value="native" checked>
+                            <span>PHP Native (index.php)</span>
+                        </label>
+                        <label class="segment">
+                            <input type="radio" name="projectType" value="public_structure">
+                            <span>Framework / Public (/public)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-row form-row-checkbox">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="inputCreateVHost">
+                        <span>Buat Virtual Host Domain Sekaligus</span>
+                    </label>
+                </div>
+
+                <div id="projectVHostRow" class="form-row hidden">
+                    <label for="inputProjectDomain">Nama Domain Kustom</label>
+                    <input type="text" id="inputProjectDomain" placeholder="contoh: kasir.test" class="form-input font-mono">
+                    <span class="form-hint">Dapat dibuka via http://kasir.test:8080</span>
+                </div>
+
+                <div id="newProjectAlert" class="modal-alert hidden"></div>
+
+                <div class="modal-actions">
+                    <button type="button" id="btnCancelNewProject" class="btn btn-subtle">Batal</button>
+                    <button type="submit" id="btnSubmitNewProject" class="btn btn-primary">Buat Proyek</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Virtual Host Modal (Add/Edit) -->
+    <div id="vhostModal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3 id="vhostModalTitle">Konfigurasi Virtual Host</h3>
+                <button id="btnCloseVHost" class="modal-close" aria-label="Tutup">&times;</button>
+            </div>
+            <form id="vhostForm" class="modal-form">
+                <div class="form-row">
+                    <label for="inputVHostDomain">Nama Domain (.test / .local / dsb)</label>
+                    <input type="text" id="inputVHostDomain" placeholder="contoh: toko.test" required class="form-input font-mono">
+                    <span class="form-hint">Disarankan menggunakan akhiran <code>.test</code> atau <code>.local</code></span>
+                </div>
+
+                <div class="form-row">
+                    <label for="selectVHostFolder">Arahkan ke Folder (dalam www/htdocs)</label>
+                    <input type="text" id="inputVHostFolder" placeholder="contoh: toko atau toko/public" required class="form-input font-mono">
+                    <span class="form-hint">Contoh: <code>toko</code> untuk PHP Native atau <code>toko/public</code> untuk Laravel/CI4</span>
+                </div>
+
+                <div class="form-row form-row-checkbox">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="inputVHostEnabled" checked>
+                        <span>Aktifkan Virtual Host ini</span>
+                    </label>
+                </div>
+
+                <div id="vhostAlert" class="modal-alert hidden"></div>
+
+                <div class="modal-actions">
+                    <button type="button" id="btnDeleteVHost" class="btn btn-danger-ghost hidden">Hapus Host</button>
+                    <div style="flex: 1"></div>
+                    <button type="button" id="btnCancelVHost" class="btn btn-subtle">Batal</button>
+                    <button type="submit" id="btnSubmitVHost" class="btn btn-primary">Simpan Virtual Host</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Windows Hosts File Helper Modal -->
+    <div id="hostsHelperModal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3>Panduan Domain Lokal di Windows</h3>
+                <button id="btnCloseHostsHelper" class="modal-close" aria-label="Tutup">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p style="font-size: 13px; color: var(--text-body); line-height: 1.6; margin-bottom: 12px;">
+                    Agar domain kustom seperti <code>toko.test</code> dapat diakses di browser Anda, Windows perlu mengetahui bahwa domain tersebut mengarah ke komputer lokal Anda (<code>127.0.0.1</code>).
+                </p>
+
+                <div class="form-row">
+                    <label>Langkah Praktis (1 Menit):</label>
+                    <ol style="font-size: 13px; color: var(--text-body); line-height: 1.6; padding-left: 20px; margin: 0 0 14px 0;">
+                        <li>Buka <strong>Notepad</strong> sebagai <em>Administrator</em> (klik kanan Notepad &rarr; Run as administrator).</li>
+                        <li>Buka berkas: <code class="font-mono">C:\Windows\System32\drivers\etc\hosts</code></li>
+                        <li>Tambahkan baris berikut di paling bawah file:</li>
+                    </ol>
+                    <div class="code-box-copy">
+                        <pre id="hostsSampleCode" class="font-mono" style="margin:0; padding: 10px; background: #0f172a; color: #38bdf8; border-radius: 6px; font-size: 12px;">127.0.0.1  toko.test
+127.0.0.1  proyekku.test</pre>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" id="btnCloseHostsHelperBottom" class="btn btn-primary">Saya Mengerti</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shutdown & Server Power Dialog -->
+    <div id="shutdownModal" class="modal-overlay hidden">
+        <div class="modal-box modal-box-sm">
+            <div class="modal-head">
+                <div class="modal-title-with-icon">
+                    <span class="modal-icon-badge danger">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                            <line x1="12" y1="2" x2="12" y2="12"></line>
+                        </svg>
+                    </span>
+                    <h3>Kontrol Daya & Server</h3>
+                </div>
+                <button id="btnCloseShutdown" class="modal-close" aria-label="Tutup">&times;</button>
+            </div>
+            <div class="modal-content-body">
+                <p>Pilih tindakan yang ingin Anda lakukan terhadap layanan web server:</p>
+                
+                <div class="shutdown-dialog-options">
+                    <button type="button" id="btnActionRestartServices" class="shutdown-opt-btn restart">
+                        <div class="opt-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        </div>
+                        <div class="opt-text">
+                            <strong>Mulai Ulang (Restart Server)</strong>
+                            <span>Restart Apache & MariaDB seketika tanpa menutup panel</span>
+                        </div>
+                    </button>
+
+                    <button type="button" id="btnActionStopServices" class="shutdown-opt-btn warning">
+                        <div class="opt-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect></svg>
+                        </div>
+                        <div class="opt-text">
+                            <strong>Hentikan Semua Layanan</strong>
+                            <span>Matikan Apache & MariaDB, panel tetap aktif untuk dinyalakan lagi</span>
+                        </div>
+                    </button>
+
+                    <button type="button" id="btnActionFullShutdown" class="shutdown-opt-btn danger">
+                        <div class="opt-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+                        </div>
+                        <div class="opt-text">
+                            <strong>Matikan & Tutup Aplikasi</strong>
+                            <span>Hentikan semua layanan dan tutup program MyLokalWebserver</span>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 14px;">
+                    <button type="button" id="btnCancelShutdown" class="btn btn-subtle" style="width: 100%;">Batal</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fullscreen Shutdown Screen with Auto-Reconnect & Restart -->
+    <div id="shutdownOverlay" class="shutdown-screen hidden">
+        <div class="shutdown-card">
+            <div class="shutdown-icon-wrap">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                </svg>
+            </div>
+            <h2>MyLokalWebserver Telah Dimatikan</h2>
+            <p id="shutdownOverlayDesc">Layanan Apache, MariaDB, dan aplikasi telah dinonaktifkan dengan aman.</p>
+            
+            <div class="shutdown-reconnect-box">
+                <div class="reconnect-status">
+                    <span class="status-indicator-dot checking" id="reconnectDot"></span>
+                    <span id="reconnectStatusText">Mendeteksi server di latar belakang...</span>
+                </div>
+                <div class="shutdown-actions" style="width: 100%; margin-top: 8px;">
+                    <button type="button" id="btnRestartFromShutdown" class="btn btn-primary btn-block" style="width: 100%; justify-content: center;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                        <span id="btnRestartFromShutdownText">Cek Status / Hubungkan Kembali</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="shutdown-hint">
+                <span>💡 <strong>Untuk menyalakan kembali:</strong> Cukup jalankan <code>start.bat</code> atau <code>mylokalwebserver.exe</code>. Halaman ini akan mendeteksi dan langsung aktif kembali secara otomatis!</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>
