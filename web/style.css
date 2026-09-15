@@ -373,15 +373,11 @@ body {
 
 .quick-links-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 12px;
     width: 100%;
-}
-
-@media (max-width: 1024px) {
-    .quick-links-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 @media (max-width: 600px) {
@@ -404,6 +400,7 @@ body {
     transition: all 0.15s ease;
     cursor: pointer;
     min-width: 0;
+    max-width: 100%;
     width: 100%;
     box-sizing: border-box;
     overflow: hidden;
@@ -421,6 +418,12 @@ body {
     font-size: inherit;
     width: 100%;
     min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    line-height: inherit;
+    appearance: none;
+    -webkit-appearance: none;
+    box-sizing: border-box;
 }
 
 .access-tile-icon {

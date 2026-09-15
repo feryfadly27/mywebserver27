@@ -10,6 +10,12 @@
       "folder": "kasir-app",
       "document_root": "C:\\Users\\Fery\\Documents\\Project\\webserver\\www\\htdocs\\kasir-app",
       "enabled": true
+    },
+    {
+      "domain": "newproject.test",
+      "folder": "newproject",
+      "document_root": "C:\\Users\\Fery\\Documents\\Project\\webserver\\www\\htdocs\\newproject",
+      "enabled": true
     }
   ]
 }

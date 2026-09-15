@@ -110,12 +110,19 @@ func main() {
 	mux.HandleFunc("/api/update/progress", HandleUpdateProgress)
 	mux.HandleFunc("/ws/terminal", HandleTerminalWebSocket)
 
-	// Static Web Frontend (Embedded)
-	webSubFS, err := fs.Sub(webFS, "web")
-	if err != nil {
-		log.Fatalf("Failed to load embedded web assets: %v", err)
+	// Static Web Frontend (Prefer disk if folder exists next to binary, fallback to embedded)
+	var staticFS http.FileSystem
+	diskWeb := filepath.Join(AppRootDir, "web")
+	if info, err := os.Stat(diskWeb); err == nil && info.IsDir() {
+		staticFS = http.Dir(diskWeb)
+	} else {
+		webSubFS, err := fs.Sub(webFS, "web")
+		if err != nil {
+			log.Fatalf("Failed to load embedded web assets: %v", err)
+		}
+		staticFS = http.FS(webSubFS)
 	}
-	mux.Handle("/", http.FileServer(http.FS(webSubFS)))
+	mux.Handle("/", http.FileServer(staticFS))
 
 	// Setup Graceful Shutdown
 	sigChan := make(chan os.Signal, 1)
