@@ -19,14 +19,41 @@ func GenerateApacheConfig(settings Settings) error {
 	htdocsDir := filepath.Join(AppRootDir, "www", "htdocs")
 	logsDir := filepath.Join(AppRootDir, "logs")
 
-	// Find the PHP apache module dll name
-	phpDll := "php8apache2_4.dll"
+	// Find the PHP apache module dll name and dependent DLLs
+	var phpDll string
+	var phpTsDll string
 	files, _ := os.ReadDir(phpDir)
 	for _, f := range files {
-		if strings.HasPrefix(strings.ToLower(f.Name()), "php") && strings.HasSuffix(strings.ToLower(f.Name()), "apache2_4.dll") {
+		lowerName := strings.ToLower(f.Name())
+		if strings.HasPrefix(lowerName, "php") && strings.HasSuffix(lowerName, "apache2_4.dll") {
 			phpDll = f.Name()
-			break
 		}
+		if strings.HasPrefix(lowerName, "php") && strings.HasSuffix(lowerName, "ts.dll") {
+			phpTsDll = f.Name()
+		}
+	}
+
+	var phpModuleSection string
+	if phpDll != "" && fileExists(filepath.Join(phpDir, phpDll)) {
+		var loadFiles strings.Builder
+		if phpTsDll != "" && fileExists(filepath.Join(phpDir, phpTsDll)) {
+			loadFiles.WriteString(fmt.Sprintf("LoadFile \"%s/%s\"\n", toApachePath(phpDir), phpTsDll))
+		}
+		for _, extraDll := range []string{"libcrypto-3-x64.dll", "libssl-3-x64.dll", "libcrypto-1_1-x64.dll", "libssl-1_1-x64.dll", "libssh2.dll", "nghttp2.dll"} {
+			if fileExists(filepath.Join(phpDir, extraDll)) {
+				loadFiles.WriteString(fmt.Sprintf("LoadFile \"%s/%s\"\n", toApachePath(phpDir), extraDll))
+			}
+		}
+
+		phpModuleSection = fmt.Sprintf(`# PHP Module
+%sLoadModule php_module "%s/%s"
+PHPIniDir "%s"
+
+<FilesMatch \.php$>
+    SetHandler application/x-httpd-php
+</FilesMatch>`, loadFiles.String(), toApachePath(phpDir), phpDll, toApachePath(phpDir))
+	} else {
+		phpModuleSection = `# PHP Module (not loaded because PHP is not yet installed)`
 	}
 
 	confContent := fmt.Sprintf(`# MyLokalWebserver - Auto-generated Apache Configuration
@@ -51,13 +78,7 @@ LoadModule rewrite_module modules/mod_rewrite.so
 LoadModule setenvif_module modules/mod_setenvif.so
 LoadModule log_config_module modules/mod_log_config.so
 
-# PHP Module
-LoadModule php_module "%s/%s"
-PHPIniDir "%s"
-
-<FilesMatch \.php$>
-    SetHandler application/x-httpd-php
-</FilesMatch>
+%s
 
 DocumentRoot "%s"
 <Directory "%s">
@@ -92,8 +113,7 @@ IncludeOptional conf/vhosts.conf
 		toApachePath(apacheDir),
 		settings.ApachePort,
 		settings.ApachePort,
-		toApachePath(phpDir), phpDll,
-		toApachePath(phpDir),
+		phpModuleSection,
 		toApachePath(htdocsDir),
 		toApachePath(htdocsDir),
 		toApachePath(logsDir),

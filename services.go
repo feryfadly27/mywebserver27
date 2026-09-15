@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -48,6 +49,8 @@ func (sm *ServicesManager) StartApache() error {
 		if sm.IsPortOpen(settings.ApachePort) {
 			return nil // already running
 		}
+	} else if sm.IsPortOpen(settings.ApachePort) {
+		return fmt.Errorf("Port %d is already in use by another application. Please close the conflicting application or change Apache port in Settings.", settings.ApachePort)
 	}
 
 	// Regenerate configs in case port changed
@@ -60,20 +63,33 @@ func (sm *ServicesManager) StartApache() error {
 		apacheBin = filepath.Join(AppRootDir, "bin", "apache", "bin", "httpd")
 	}
 	if !fileExists(apacheBin) {
-		return fmt.Errorf("apache binary not found at %s", apacheBin)
+		return fmt.Errorf("apache binary not found at %s. Please ensure Apache is downloaded/installed via Component Downloader.", apacheBin)
 	}
 
 	confPath := filepath.Join(AppRootDir, "bin", "apache", "conf", "httpd.conf")
-	cmd := exec.Command(apacheBin, "-f", confPath)
-	cmd.Dir = filepath.Join(AppRootDir, "bin", "apache")
-	SetCmdHideWindow(cmd)
-
-	// Add PHP directory to PATH so Apache and PHP extensions find required libraries
 	phpDir := filepath.Join(AppRootDir, "bin", "php")
 	mariadbBinDir := filepath.Join(AppRootDir, "bin", "mariadb", "bin")
 	apacheBinDir := filepath.Join(AppRootDir, "bin", "apache", "bin")
 	sep := GetPathListSeparator()
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PATH=%s%s%s%s%s%s%s", phpDir, sep, mariadbBinDir, sep, apacheBinDir, sep, os.Getenv("PATH")))
+	envPath := fmt.Sprintf("PATH=%s%s%s%s%s%s%s", phpDir, sep, mariadbBinDir, sep, apacheBinDir, sep, os.Getenv("PATH"))
+
+	// Pre-flight Apache syntax check
+	testCmd := exec.Command(apacheBin, "-t", "-f", confPath)
+	testCmd.Dir = filepath.Join(AppRootDir, "bin", "apache")
+	SetCmdHideWindow(testCmd)
+	testCmd.Env = append(os.Environ(), envPath)
+	if output, err := testCmd.CombinedOutput(); err != nil {
+		outStr := strings.TrimSpace(string(output))
+		if outStr != "" {
+			return fmt.Errorf("Apache configuration error: %s", outStr)
+		}
+		return fmt.Errorf("Apache pre-flight test failed: %w", err)
+	}
+
+	cmd := exec.Command(apacheBin, "-f", confPath)
+	cmd.Dir = filepath.Join(AppRootDir, "bin", "apache")
+	SetCmdHideWindow(cmd)
+	cmd.Env = append(os.Environ(), envPath)
 
 	// Forward logs
 	logsDir := filepath.Join(AppRootDir, "logs")
@@ -91,7 +107,7 @@ func (sm *ServicesManager) StartApache() error {
 	sm.apacheCmd = cmd
 	sm.apacheStart = time.Now()
 
-	// Wait up to 3 seconds for port to open
+	// Monitor process
 	go func() {
 		_ = cmd.Wait()
 		sm.lock.Lock()
@@ -100,6 +116,25 @@ func (sm *ServicesManager) StartApache() error {
 		}
 		sm.lock.Unlock()
 	}()
+
+	// Brief wait to ensure Apache hasn't crashed on boot
+	time.Sleep(500 * time.Millisecond)
+	sm.lock.Lock()
+	isExited := (sm.apacheCmd == nil)
+	sm.lock.Unlock()
+
+	if isExited {
+		logBytes, _ := os.ReadFile(filepath.Join(logsDir, "apache_runner.log"))
+		errBytes, _ := os.ReadFile(filepath.Join(logsDir, "apache_error.log"))
+		combinedLogs := strings.TrimSpace(string(logBytes) + "\n" + string(errBytes))
+		if len(combinedLogs) > 350 {
+			combinedLogs = combinedLogs[len(combinedLogs)-350:]
+		}
+		if combinedLogs != "" {
+			return fmt.Errorf("Apache stopped immediately after start: %s", combinedLogs)
+		}
+		return fmt.Errorf("Apache failed to start. On Windows, please ensure Microsoft Visual C++ 2015-2022 Redistributable (x64) is installed.")
+	}
 
 	return nil
 }
