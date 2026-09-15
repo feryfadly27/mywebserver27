@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const AppVersion = "v1.1.0"
+const AppVersion = "v1.2.0"
 
 type GitHubCommitInfo struct {
 	SHA    string `json:"sha"`

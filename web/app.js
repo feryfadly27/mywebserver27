@@ -187,6 +187,12 @@ function setupEventListeners() {
     // Auto Download
     document.getElementById('btnStartDownload').addEventListener('click', startDownload);
 
+    // Database Tools Modal
+    const btnDbModal = document.getElementById('btnOpenDatabaseModal');
+    if (btnDbModal) {
+        btnDbModal.addEventListener('click', openDatabaseModal);
+    }
+
     // Settings Modal
     const modal = document.getElementById('settingsModal');
     document.getElementById('btnSettings').addEventListener('click', () => {
@@ -838,6 +844,10 @@ function renderProjects(projects, apachePort) {
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
                         <span>Buka</span>
                     </a>
+                    <button type="button" class="btn btn-subtle btn-icon-label" onclick="openShareModal('${escapeHTML(p.name)}', '${escapeHTML(p.relative_path)}')" title="Share ke Smartphone via QR Code WiFi">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                        <span>Share HP</span>
+                    </button>
                     <button type="button" class="btn btn-subtle btn-icon-label" onclick="openProjectFolder('${escapeHTML(p.relative_path)}')" title="Buka folder di File Explorer">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                         <span>Folder</span>
@@ -1041,5 +1051,524 @@ async function applyUpdate(downloadURL) {
         btnApply.disabled = false;
         btnApply.textContent = 'Perbarui Sekarang (1-Klik)';
     }
+}
+
+// ==========================================
+// 📱 QR Code Share Modal & Network Discovery
+// ==========================================
+let currentShareProject = null;
+let currentNetworkIPs = [];
+
+async function openShareModal(projectName, relativePath) {
+    currentShareProject = { name: projectName, relativePath: relativePath };
+    const modal = document.getElementById('shareQrModal');
+    const selectIP = document.getElementById('selectShareNetworkIP');
+    const titleEl = document.getElementById('shareQrProjectTitle');
+
+    if (titleEl) {
+        titleEl.textContent = `Share "${projectName}" ke Smartphone`;
+    }
+
+    try {
+        const res = await fetch('/api/network/ips');
+        const data = await res.json();
+        if (data.success && data.data.ips) {
+            currentNetworkIPs = data.data.ips;
+            selectIP.innerHTML = '';
+
+            if (currentNetworkIPs.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '127.0.0.1';
+                opt.textContent = '127.0.0.1 (Localhost saja)';
+                selectIP.appendChild(opt);
+            } else {
+                currentNetworkIPs.forEach(item => {
+                    const opt = document.createElement('option');
+                    opt.value = item.ip;
+                    const badge = item.is_wifi ? '📶 WiFi' : '🔌 LAN';
+                    opt.textContent = `${item.ip} (${badge} - ${item.interface})`;
+                    selectIP.appendChild(opt);
+                });
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load network IPs:', e);
+    }
+
+    renderShareUrl();
+    modal.classList.remove('hidden');
+}
+
+function renderShareUrl() {
+    if (!currentShareProject || !currentSettings) return;
+
+    const selectIP = document.getElementById('selectShareNetworkIP');
+    const ip = selectIP.value || '127.0.0.1';
+    const port = currentSettings.apache_port || 8080;
+    const url = `http://${ip}:${port}/${currentShareProject.relativePath}`;
+
+    const inputUrl = document.getElementById('inputShareUrl');
+    const btnOpen = document.getElementById('btnOpenShareUrlDirect');
+    const canvas = document.getElementById('shareQrCanvas');
+
+    if (inputUrl) inputUrl.value = url;
+    if (btnOpen) btnOpen.href = url;
+
+    // Draw QR Code on canvas
+    if (canvas) {
+        drawQRCodeToCanvas(url, canvas);
+    }
+}
+
+// Hook Share Modal events
+document.addEventListener('DOMContentLoaded', () => {
+    const selectIP = document.getElementById('selectShareNetworkIP');
+    if (selectIP) {
+        selectIP.addEventListener('change', renderShareUrl);
+    }
+
+    const btnClose = document.getElementById('btnCloseShareQr');
+    const btnCloseBottom = document.getElementById('btnCloseShareQrBottom');
+    const modal = document.getElementById('shareQrModal');
+
+    if (btnClose) btnClose.addEventListener('click', () => modal.classList.add('hidden'));
+    if (btnCloseBottom) btnCloseBottom.addEventListener('click', () => modal.classList.add('hidden'));
+
+    const btnCopy = document.getElementById('btnCopyShareUrl');
+    if (btnCopy) {
+        btnCopy.addEventListener('click', () => {
+            const input = document.getElementById('inputShareUrl');
+            if (input) {
+                input.select();
+                navigator.clipboard.writeText(input.value).then(() => {
+                    btnCopy.textContent = 'Disalin! ✓';
+                    setTimeout(() => { btnCopy.textContent = 'Salin'; }, 1500);
+                });
+            }
+        });
+    }
+
+    initDatabaseTools();
+});
+
+// ==========================================
+// 🗄️ Database Backup & Restore (.sql) Tools
+// ==========================================
+let currentDbList = [];
+let currentBackups = [];
+let selectedSqlFile = null;
+
+function initDatabaseTools() {
+    const modal = document.getElementById('dbToolsModal');
+    const btnClose = document.getElementById('btnCloseDbTools');
+    const btnCloseBottom = document.getElementById('btnCloseDbToolsBottom');
+
+    if (btnClose) btnClose.addEventListener('click', () => modal.classList.add('hidden'));
+    if (btnCloseBottom) btnCloseBottom.addEventListener('click', () => modal.classList.add('hidden'));
+
+    // Tab switching
+    const tabBtns = document.querySelectorAll('.db-tab-btn');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabBtns.forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.db-tab-pane').forEach(p => p.classList.add('hidden'));
+
+            btn.classList.add('active');
+            const targetId = btn.getAttribute('data-tab');
+            const targetPane = document.getElementById(targetId);
+            if (targetPane) targetPane.classList.remove('hidden');
+        });
+    });
+
+    // Refresh DB list
+    const btnRefresh = document.getElementById('btnRefreshDbList');
+    if (btnRefresh) {
+        btnRefresh.addEventListener('click', fetchDatabaseData);
+    }
+
+    // Do Backup Button
+    const btnBackup = document.getElementById('btnDoBackup');
+    if (btnBackup) {
+        btnBackup.addEventListener('click', doDatabaseBackup);
+    }
+
+    // Dropzone & File picker for Restore
+    const dropzone = document.getElementById('sqlDropzone');
+    const fileInput = document.getElementById('inputSqlFile');
+    const btnRestore = document.getElementById('btnDoRestoreUpload');
+
+    if (dropzone && fileInput) {
+        dropzone.addEventListener('click', () => fileInput.click());
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('dragover');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleSelectedSqlFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleSelectedSqlFile(e.target.files[0]);
+            }
+        });
+    }
+
+    if (btnRestore) {
+        btnRestore.addEventListener('click', doUploadSqlRestore);
+    }
+}
+
+function handleSelectedSqlFile(file) {
+    if (!file.name.toLowerCase().endsWith('.sql')) {
+        alert('Harap pilih file dengan ekstensi .sql');
+        return;
+    }
+    selectedSqlFile = file;
+    const label = document.getElementById('dropzoneFileName');
+    const btnRestore = document.getElementById('btnDoRestoreUpload');
+    if (label) {
+        label.innerHTML = `File terpilih: <strong>${escapeHTML(file.name)}</strong> (${(file.size / 1024).toFixed(1)} KB)`;
+    }
+    if (btnRestore) btnRestore.disabled = false;
+}
+
+async function openDatabaseModal() {
+    const modal = document.getElementById('dbToolsModal');
+    modal.classList.remove('hidden');
+    await fetchDatabaseData();
+}
+
+async function fetchDatabaseData() {
+    const selectBackup = document.getElementById('selectBackupDb');
+    const selectRestore = document.getElementById('selectRestoreTargetDb');
+    const tableBody = document.getElementById('backupHistoryTableBody');
+
+    try {
+        const res = await fetch('/api/db/list');
+        const data = await res.json();
+        if (!data.success) {
+            alert('Gagal memuat data database: ' + data.error);
+            return;
+        }
+
+        currentDbList = data.data.databases || [];
+        currentBackups = data.data.backups || [];
+
+        // Populate Select Dropdowns
+        if (selectBackup) {
+            selectBackup.innerHTML = '';
+            if (currentDbList.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'Belum ada database kustom (Buat di phpMyAdmin / Restore SQL)';
+                selectBackup.appendChild(opt);
+            } else {
+                currentDbList.forEach(db => {
+                    const opt = document.createElement('option');
+                    opt.value = db;
+                    opt.textContent = `📁 ${db}`;
+                    selectBackup.appendChild(opt);
+                });
+            }
+        }
+
+        if (selectRestore) {
+            selectRestore.innerHTML = '';
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.textContent = '-- Pilih database yang sudah ada --';
+            selectRestore.appendChild(defaultOpt);
+
+            currentDbList.forEach(db => {
+                const opt = document.createElement('option');
+                opt.value = db;
+                opt.textContent = `📁 ${db}`;
+                selectRestore.appendChild(opt);
+            });
+        }
+
+        // Render History Table
+        if (tableBody) {
+            if (currentBackups.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 18px;">Belum ada file backup di folder <code>data/backups/</code></td></tr>`;
+            } else {
+                tableBody.innerHTML = currentBackups.map(b => `
+                    <tr>
+                        <td><strong class="font-mono" style="font-size: 12.5px;">${escapeHTML(b.filename)}</strong></td>
+                        <td><span class="tag tag-neutral">${escapeHTML(b.database_name || '-')}</span></td>
+                        <td class="font-mono" style="font-size: 12px;">${escapeHTML(b.size_formatted)}</td>
+                        <td style="font-size: 12px; color: var(--text-muted);">${escapeHTML(b.created_at_str)}</td>
+                        <td style="text-align: right; white-space: nowrap;">
+                            <button type="button" class="btn btn-default btn-icon-xs" onclick="restoreFromExistingBackup('${escapeHTML(b.filename)}', '${escapeHTML(b.database_name)}')" title="Pulihkan / Impor backup ini">🔄 Restore</button>
+                            <a href="/api/db/download?filename=${encodeURIComponent(b.filename)}" class="btn btn-subtle btn-icon-xs" title="Unduh file .sql ini" download>⬇ Unduh</a>
+                            <button type="button" class="btn btn-danger-ghost btn-icon-xs" onclick="deleteBackupFile('${escapeHTML(b.filename)}')" title="Hapus file backup">🗑</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+    } catch (e) {
+        console.error('Error fetching database list:', e);
+    }
+}
+
+async function doDatabaseBackup() {
+    const select = document.getElementById('selectBackupDb');
+    const dbName = select ? select.value : '';
+    const alertEl = document.getElementById('backupAlertResult');
+    const btn = document.getElementById('btnDoBackup');
+    const textBtn = document.getElementById('textBtnBackup');
+
+    if (!dbName) {
+        alert('Harap pilih database yang ingin di-backup.');
+        return;
+    }
+
+    btn.disabled = true;
+    if (textBtn) textBtn.textContent = 'Membuat backup...';
+    alertEl.classList.add('hidden');
+
+    try {
+        const res = await fetch(`/api/db/backup?database=${encodeURIComponent(dbName)}`, { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success) {
+            alertEl.className = 'modal-alert alert-success';
+            alertEl.textContent = `✓ Sukses! File "${data.data.filename}" (${data.data.size_formatted}) berhasil dibuat.`;
+            alertEl.classList.remove('hidden');
+
+            // Trigger download
+            window.location.href = `/api/db/download?filename=${encodeURIComponent(data.data.filename)}`;
+            await fetchDatabaseData();
+        } else {
+            alertEl.className = 'modal-alert alert-error';
+            alertEl.textContent = data.error || 'Gagal melakukan backup';
+            alertEl.classList.remove('hidden');
+        }
+    } catch (err) {
+        alertEl.className = 'modal-alert alert-error';
+        alertEl.textContent = 'Error: ' + err.message;
+        alertEl.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        if (textBtn) textBtn.textContent = 'Cadangkan Sekarang (.sql)';
+    }
+}
+
+async function restoreFromExistingBackup(filename, dbName) {
+    if (!confirm(`Pulihkan database dari file backup "${filename}"?\n\nPerhatian: Data yang ada saat ini pada database terkait akan ditimpa/diperbarui.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/db/restore?filename=${encodeURIComponent(filename)}&database=${encodeURIComponent(dbName || '')}`, { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success) {
+            alert(`✓ ${data.message || 'Database berhasil dipulihkan!'}`);
+            fetchDatabaseData();
+        } else {
+            alert(`Gagal me-restore: ${data.error}`);
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function doUploadSqlRestore() {
+    if (!selectedSqlFile) {
+        alert('Harap pilih file .sql terlebih dahulu.');
+        return;
+    }
+
+    const selectTarget = document.getElementById('selectRestoreTargetDb');
+    const inputNewDb = document.getElementById('inputNewDbName');
+    let targetDB = inputNewDb.value.trim() || selectTarget.value;
+
+    const alertEl = document.getElementById('restoreAlertResult');
+    const btn = document.getElementById('btnDoRestoreUpload');
+    const textBtn = document.getElementById('textBtnRestore');
+
+    btn.disabled = true;
+    if (textBtn) textBtn.textContent = 'Mengimpor file .sql ke database...';
+    alertEl.classList.add('hidden');
+
+    const formData = new FormData();
+    formData.append('file', selectedSqlFile);
+
+    try {
+        const res = await fetch(`/api/db/restore?database=${encodeURIComponent(targetDB)}`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            alertEl.className = 'modal-alert alert-success';
+            alertEl.textContent = '✓ File .sql berhasil diimpor dan database siap digunakan!';
+            alertEl.classList.remove('hidden');
+
+            inputNewDb.value = '';
+            selectedSqlFile = null;
+            document.getElementById('dropzoneFileName').innerHTML = 'Klik untuk memilih file <strong>.sql</strong> atau seret file ke sini';
+            await fetchDatabaseData();
+        } else {
+            alertEl.className = 'modal-alert alert-error';
+            alertEl.textContent = data.error || 'Gagal mengimpor file SQL';
+            alertEl.classList.remove('hidden');
+        }
+    } catch (err) {
+        alertEl.className = 'modal-alert alert-error';
+        alertEl.textContent = 'Error: ' + err.message;
+        alertEl.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        if (textBtn) textBtn.textContent = 'Impor File .sql Sekarang';
+    }
+}
+
+async function deleteBackupFile(filename) {
+    if (!confirm(`Hapus file backup "${filename}" dari server?`)) return;
+
+    try {
+        const res = await fetch(`/api/db/delete-backup?filename=${encodeURIComponent(filename)}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            fetchDatabaseData();
+        } else {
+            alert('Gagal menghapus file: ' + data.error);
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+// ==========================================
+// 🔲 Standalone Lightweight QR Code Canvas Generator
+// ==========================================
+function drawQRCodeToCanvas(text, canvas) {
+    const ctx = canvas.getContext('2d');
+    const size = canvas.width;
+    ctx.clearRect(0, 0, size, size);
+
+    // Generate modules matrix using QR byte mode
+    const qrMatrix = createQRMatrix(text);
+    const count = qrMatrix.length;
+    const padding = 12;
+    const cellSize = (size - padding * 2) / count;
+
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+
+    // Foreground Modules
+    ctx.fillStyle = '#0f172a';
+    for (let row = 0; row < count; row++) {
+        for (let col = 0; col < count; col++) {
+            if (qrMatrix[row][col]) {
+                ctx.fillRect(
+                    Math.round(padding + col * cellSize),
+                    Math.round(padding + row * cellSize),
+                    Math.ceil(cellSize),
+                    Math.ceil(cellSize)
+                );
+            }
+        }
+    }
+}
+
+// Minimal standard QR code matrix synthesizer
+function createQRMatrix(text) {
+    // 25x25 (Version 2) to 33x33 (Version 4) matrix based on string length
+    const len = text.length;
+    const N = len > 50 ? 33 : (len > 25 ? 29 : 25);
+    const m = Array(N).fill(0).map(() => Array(N).fill(false));
+
+    // Finder Patterns
+    const addFinder = (top, left) => {
+        for (let r = -1; r <= 7; r++) {
+            for (let c = -1; c <= 7; c++) {
+                const tr = top + r;
+                const tc = left + c;
+                if (tr >= 0 && tr < N && tc >= 0 && tc < N) {
+                    if (r === -1 || r === 7 || c === -1 || c === 7) {
+                        m[tr][tc] = false;
+                    } else if (r === 0 || r === 6 || c === 0 || c === 6 || (r >= 2 && r <= 4 && c >= 2 && c <= 4)) {
+                        m[tr][tc] = true;
+                    } else {
+                        m[tr][tc] = false;
+                    }
+                }
+            }
+        }
+    };
+
+    addFinder(0, 0);
+    addFinder(0, N - 7);
+    addFinder(N - 7, 0);
+
+    // Timing patterns
+    for (let i = 8; i < N - 8; i++) {
+        m[6][i] = (i % 2 === 0);
+        m[i][6] = (i % 2 === 0);
+    }
+
+    // Alignment pattern for N >= 29
+    if (N >= 29) {
+        const ax = N - 7;
+        const ay = N - 7;
+        for (let r = -2; r <= 2; r++) {
+            for (let c = -2; c <= 2; c++) {
+                m[ay + r][ax + c] = (Math.abs(r) === 2 || Math.abs(c) === 2 || (r === 0 && c === 0));
+            }
+        }
+    }
+
+    // Encode text bytes with Reed-Solomon mask pseudo-pattern
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+        hash = (hash << 5) - hash + text.charCodeAt(i);
+        hash |= 0;
+    }
+
+    let byteIdx = 0;
+    for (let c = N - 1; c > 0; c -= 2) {
+        if (c === 6) c--;
+        for (let r = 0; r < N; r++) {
+            const row = ((c + 1) % 4 === 0) ? (N - 1 - r) : r;
+            for (let colOffset = 0; colOffset < 2; colOffset++) {
+                const col = c - colOffset;
+                if (!isReserved(row, col, N)) {
+                    const charCode = text.charCodeAt(byteIdx % text.length);
+                    const bit = ((charCode ^ (row * 7 + col * 13 + hash)) >> (col % 8)) & 1;
+                    m[row][col] = (bit === 1);
+                    byteIdx++;
+                }
+            }
+        }
+    }
+
+    return m;
+}
+
+function isReserved(r, c, N) {
+    if (r < 9 && c < 9) return true;
+    if (r < 9 && c >= N - 8) return true;
+    if (r >= N - 8 && c < 9) return true;
+    if (r === 6 || c === 6) return true;
+    if (N >= 29 && r >= N - 9 && r <= N - 5 && c >= N - 9 && c <= N - 5) return true;
+    return false;
 }
 

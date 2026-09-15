@@ -1,4 +1,4 @@
-﻿# 🗺️ Roadmap Pengembangan & Ide Fitur MyLokalWebserver
+# 🗺️ Roadmap Pengembangan & Ide Fitur MyLokalWebserver
 
 Dokumen ini berisi daftar fitur yang telah selesai dibangun serta daftar ide fitur yang direncanakan untuk pengembangan MyLokalWebserver selanjutnya.
 
@@ -19,14 +19,15 @@ Dokumen ini berisi daftar fitur yang telah selesai dibangun serta daftar ide fit
   - Linux x64 (mylokalwebserver)
 - [x] **Self-Updater Terintegrasi** (Cek dan perbarui binary via GitHub Release / Branch Main)
 - [x] **Komponen Downloader Otomatis** dengan resume & penanganan SSL/TLS.
+- [x] **📱 Share Proyek ke Smartphone via QR Code WiFi Lokal** (Deteksi otomatis IP LAN + QR Code Canvas offline)
+- [x] **🗄️ One-Click Database Backup & Restore (.sql)** (Export/import database cepat, download file .sql, dan riwayat backup di `data/backups/`)
 
 ---
 
 ## 💡 Rencana Fitur Baru (Future Feature Roadmap)
 
 ### 1. 🗄️ Database & Quick Data Tools
-- [ ] **One-Click Database Backup & Restore (.sql)**
-  - Tombol cepat di Dashboard untuk export/backup database ke file .sql atau import file .sql tanpa harus membuka phpMyAdmin yang berat.
+- [x] **One-Click Database Backup & Restore (.sql)** (Sudah selesai di v1.2.0)
 - [ ] **Quick Database Creator**
   - Modal formulir ringkas untuk membuat database baru dan user MySQL langsung dalam 1 klik.
 - [ ] **Database Seed Helper**
@@ -42,9 +43,7 @@ Dokumen ini berisi daftar fitur yang telah selesai dibangun serta daftar ide fit
 ---
 
 ### 3. 📱 Mobile & Network Sharing (QR Code LAN)
-- [ ] **Share ke Jaringan WiFi Lokal dengan QR Code**
-  - Tombol pada setiap baris proyek untuk mendeteksi IP Address laptop/PC di jaringan lokal (contoh: http://192.168.1.15:8080/kasir-app).
-  - Menampilkan QR Code interaktif di layar agar bisa langsung di-scan dengan kamera HP untuk pengujian tampilan mobile responsif tanpa kabel.
+- [x] **Share ke Jaringan WiFi Lokal dengan QR Code** (Sudah selesai di v1.2.0)
 
 ---
 

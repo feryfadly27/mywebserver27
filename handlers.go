@@ -3,10 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -779,6 +781,205 @@ func HandleUpdateProgress(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, APIResponse{
 		Success: true,
 		Data:    prog,
+	})
+}
+
+// Network LAN IP Info
+type NetworkIPInfo struct {
+	IP        string `json:"ip"`
+	Interface string `json:"interface"`
+	IsWiFi    bool   `json:"is_wifi"`
+}
+
+func GetLocalIPAddresses() []NetworkIPInfo {
+	var ips []NetworkIPInfo
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return ips
+	}
+
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+
+			if ip != nil && ip.To4() != nil && !ip.IsLoopback() {
+				ipStr := ip.String()
+				name := iface.Name
+				isWiFi := strings.Contains(strings.ToLower(name), "wi-fi") || strings.Contains(strings.ToLower(name), "wireless") || strings.Contains(strings.ToLower(name), "wlan")
+				ips = append(ips, NetworkIPInfo{
+					IP:        ipStr,
+					Interface: name,
+					IsWiFi:    isWiFi,
+				})
+			}
+		}
+	}
+
+	// Prioritize WiFi and Standard LAN IPs (192.168.x.x) over virtual adapters
+	sort.SliceStable(ips, func(i, j int) bool {
+		score := func(item NetworkIPInfo) int {
+			s := 0
+			if item.IsWiFi {
+				s += 100
+			}
+			if strings.HasPrefix(item.IP, "192.168.") {
+				s += 50
+			} else if strings.HasPrefix(item.IP, "10.") {
+				s += 40
+			}
+			lowerName := strings.ToLower(item.Interface)
+			if strings.Contains(lowerName, "wsl") || strings.Contains(lowerName, "vethernet") || strings.Contains(lowerName, "tailscale") || strings.Contains(lowerName, "zerotier") || strings.Contains(lowerName, "virtual") {
+				s -= 30
+			}
+			return s
+		}
+		return score(ips[i]) > score(ips[j])
+	})
+
+	return ips
+}
+
+func HandleNetworkIPs(w http.ResponseWriter, r *http.Request) {
+	settings := GetCurrentSettings()
+	ips := GetLocalIPAddresses()
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data: map[string]any{
+			"ips":         ips,
+			"apache_port": settings.ApachePort,
+			"panel_port":  settings.PanelPort,
+		},
+	})
+}
+
+// Database Tools Handlers
+func HandleDatabaseList(w http.ResponseWriter, r *http.Request) {
+	dbs, err := ListDatabases()
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+	backups, _ := ListBackups()
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data: map[string]any{
+			"databases": dbs,
+			"backups":   backups,
+		},
+	})
+}
+
+func HandleDatabaseBackup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+	dbName := strings.TrimSpace(r.URL.Query().Get("database"))
+	if dbName == "" {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Nama database harus dipilih"})
+		return
+	}
+	backupInfo, err := BackupDatabase(dbName)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Message: fmt.Sprintf("Database '%s' berhasil di-backup!", dbName),
+		Data:    backupInfo,
+	})
+}
+
+func HandleDatabaseRestore(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	filename := r.URL.Query().Get("filename")
+	targetDB := r.URL.Query().Get("database")
+
+	if filename != "" {
+		filePath := filepath.Join(AppRootDir, "data", "backups", filepath.Base(filename))
+		f, err := os.Open(filePath)
+		if err != nil {
+			jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "File backup tidak ditemukan: " + err.Error()})
+			return
+		}
+		defer f.Close()
+
+		if err := RestoreDatabaseFromSQL(targetDB, f); err != nil {
+			jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+			return
+		}
+
+		jsonResponse(w, http.StatusOK, APIResponse{
+			Success: true,
+			Message: "Database berhasil dipulihkan dari " + filepath.Base(filename),
+		})
+		return
+	}
+
+	// Multipart upload
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Pilih file .sql untuk di-upload"})
+		return
+	}
+	defer file.Close()
+
+	if err := RestoreDatabaseFromSQL(targetDB, file); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Message: "File .sql berhasil diimpor ke database",
+	})
+}
+
+func HandleDatabaseBackupDownload(w http.ResponseWriter, r *http.Request) {
+	filename := filepath.Base(r.URL.Query().Get("filename"))
+	if filename == "" || !strings.HasSuffix(strings.ToLower(filename), ".sql") {
+		http.Error(w, "Invalid filename", http.StatusBadRequest)
+		return
+	}
+	filePath := filepath.Join(AppRootDir, "data", "backups", filename)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	w.Header().Set("Content-Type", "application/sql")
+	http.ServeFile(w, r, filePath)
+}
+
+func HandleDatabaseDeleteBackup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+	filename := r.URL.Query().Get("filename")
+	if err := DeleteBackupFile(filename); err != nil {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Message: "File backup berhasil dihapus",
 	})
 }
 

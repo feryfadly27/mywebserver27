@@ -285,6 +285,21 @@
                         </div>
                         <div class="access-tile-arrow">&rarr;</div>
                     </button>
+
+                    <button id="btnOpenDatabaseModal" type="button" class="access-tile access-tile-button" title="Cadangkan & Pulihkan Database (.sql)">
+                        <div class="access-tile-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                        </div>
+                        <div class="access-tile-info">
+                            <strong>Backup & Restore DB</strong>
+                            <span>Ekspor & Impor .sql</span>
+                        </div>
+                        <div class="access-tile-arrow">&rarr;</div>
+                    </button>
                 </div>
             </div>
 
@@ -635,6 +650,156 @@
                         </svg>
                         <span>Perbarui Sekarang (1-Klik)</span>
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Project QR Modal -->
+    <div id="shareQrModal" class="modal-overlay hidden">
+        <div class="modal-box modal-box-md">
+            <div class="modal-head">
+                <div class="modal-title-with-icon">
+                    <span class="modal-icon-badge accent">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                            <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                        </svg>
+                    </span>
+                    <h3 id="shareQrProjectTitle">Share ke Smartphone (WiFi)</h3>
+                </div>
+                <button id="btnCloseShareQr" class="modal-close" aria-label="Tutup">&times;</button>
+            </div>
+            <div class="modal-content-body">
+                <div class="share-qr-wrapper">
+                    <div class="qr-canvas-card">
+                        <canvas id="shareQrCanvas" width="190" height="190"></canvas>
+                        <span class="qr-sub-label">Arahkan kamera HP ke QR Code</span>
+                    </div>
+                    <div class="share-qr-fields">
+                        <div class="form-row">
+                            <label for="selectShareNetworkIP">Pilih IP Jaringan (WiFi / LAN):</label>
+                            <select id="selectShareNetworkIP" class="form-input"></select>
+                        </div>
+                        <div class="form-row">
+                            <label>Tautan URL Ponsel:</label>
+                            <div class="code-box-copy" style="display: flex; gap: 8px;">
+                                <input type="text" id="inputShareUrl" class="form-input font-mono" readonly style="flex: 1; font-size: 12.5px;">
+                                <button type="button" id="btnCopyShareUrl" class="btn btn-default" title="Salin tautan">Salin</button>
+                                <a id="btnOpenShareUrlDirect" href="#" target="_blank" class="btn btn-subtle" title="Buka di tab baru">Buka ↗</a>
+                            </div>
+                        </div>
+                        <div class="share-qr-tip">
+                            💡 <strong>Tips:</strong> Pastikan smartphone atau laptop lain terhubung ke <u>jaringan WiFi yang sama</u> dengan komputer ini.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions" style="margin-top: 14px;">
+                    <button type="button" id="btnCloseShareQrBottom" class="btn btn-subtle" style="width: 100%;">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Database Tools Modal (Backup & Restore .sql) -->
+    <div id="dbToolsModal" class="modal-overlay hidden">
+        <div class="modal-box modal-box-lg">
+            <div class="modal-head">
+                <div class="modal-title-with-icon">
+                    <span class="modal-icon-badge" style="background: var(--bg-subtle); color: var(--text-main); border: 1px solid var(--border-color);">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                        </svg>
+                    </span>
+                    <h3>Database Backup & Restore (.sql)</h3>
+                </div>
+                <button id="btnCloseDbTools" class="modal-close" aria-label="Tutup">&times;</button>
+            </div>
+            <div class="modal-content-body">
+                <div class="db-tools-tabs">
+                    <button type="button" class="db-tab-btn active" data-tab="tabDbBackup">📦 Cadangkan (Backup)</button>
+                    <button type="button" class="db-tab-btn" data-tab="tabDbRestore">🔄 Pulihkan (Restore / Impor)</button>
+                    <button type="button" class="db-tab-btn" data-tab="tabDbHistory">📋 Riwayat File Backup</button>
+                </div>
+
+                <!-- Tab 1: Backup -->
+                <div id="tabDbBackup" class="db-tab-pane active">
+                    <div class="form-row">
+                        <label for="selectBackupDb">Pilih Database yang Ingin Di-backup:</label>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="selectBackupDb" class="form-input" style="flex: 1;"></select>
+                            <button type="button" id="btnRefreshDbList" class="btn btn-default" title="Segarkan daftar database">🔄 Segarkan</button>
+                        </div>
+                    </div>
+                    <div class="db-action-card" style="margin-top: 14px;">
+                        <button type="button" id="btnDoBackup" class="btn btn-primary">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <span id="textBtnBackup">Cadangkan Sekarang (.sql)</span>
+                        </button>
+                        <span class="db-hint-text">File backup akan disimpan di folder <code>data/backups/</code> dan otomatis terunduh di browser.</span>
+                    </div>
+                    <div id="backupAlertResult" class="modal-alert hidden" style="margin-top: 12px;"></div>
+                </div>
+
+                <!-- Tab 2: Restore / Impor SQL -->
+                <div id="tabDbRestore" class="db-tab-pane hidden">
+                    <div class="form-row">
+                        <label for="selectRestoreTargetDb">Database Tujuan (Target):</label>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="selectRestoreTargetDb" class="form-input" style="flex: 1;"></select>
+                            <input type="text" id="inputNewDbName" class="form-input" placeholder="Atau buat database baru..." style="flex: 1;">
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-top: 12px;">
+                        <label>Pilih File .sql untuk Diimpor:</label>
+                        <div class="sql-dropzone" id="sqlDropzone">
+                            <input type="file" id="inputSqlFile" accept=".sql" style="display: none;">
+                            <div class="dropzone-content">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); margin-bottom: 6px;">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                                <p id="dropzoneFileName" style="margin: 0; font-size: 13px; color: var(--text-body);">Klik untuk memilih file <strong>.sql</strong> atau seret file ke sini</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 14px;">
+                        <button type="button" id="btnDoRestoreUpload" class="btn btn-primary" disabled style="width: 100%; justify-content: center;">
+                            <span id="textBtnRestore">Impor File .sql Sekarang</span>
+                        </button>
+                    </div>
+                    <div id="restoreAlertResult" class="modal-alert hidden" style="margin-top: 12px;"></div>
+                </div>
+
+                <!-- Tab 3: History -->
+                <div id="tabDbHistory" class="db-tab-pane hidden">
+                    <div class="backup-table-wrapper">
+                        <table class="backup-table">
+                            <thead>
+                                <tr>
+                                    <th>Nama File</th>
+                                    <th>Database</th>
+                                    <th>Ukuran</th>
+                                    <th>Tanggal Dibuat</th>
+                                    <th style="text-align: right;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="backupHistoryTableBody">
+                                <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 18px;">Memuat riwayat backup...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 16px;">
+                    <button type="button" id="btnCloseDbToolsBottom" class="btn btn-subtle" style="width: 100%;">Tutup</button>
                 </div>
             </div>
         </div>

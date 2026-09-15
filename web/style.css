@@ -1455,6 +1455,186 @@ body {
     word-break: break-word;
 }
 
+/* Modal Sizing */
+.modal-box-sm {
+    max-width: 440px;
+}
+
+.modal-box-md {
+    max-width: 540px;
+}
+
+.modal-box-lg {
+    max-width: 680px;
+}
+
+/* Share QR Code Modal */
+.share-qr-wrapper {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+@media (max-width: 560px) {
+    .share-qr-wrapper {
+        flex-direction: column;
+    }
+}
+
+.qr-canvas-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    box-shadow: var(--shadow-sm);
+    flex-shrink: 0;
+}
+
+#shareQrCanvas {
+    width: 170px;
+    height: 170px;
+    image-rendering: pixelated;
+}
+
+.qr-sub-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    font-weight: 500;
+}
+
+.share-qr-fields {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.share-qr-tip {
+    font-size: 12px;
+    color: var(--text-muted);
+    background-color: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    line-height: 1.5;
+}
+
+/* Database Tools Tabs & Modals */
+.db-tools-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 16px;
+    gap: 4px;
+}
+
+.db-tab-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+}
+
+.db-tab-btn:hover {
+    color: var(--text-main);
+}
+
+.db-tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    font-weight: 600;
+}
+
+.db-action-card {
+    background-color: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.db-hint-text {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+    flex: 1;
+}
+
+.sql-dropzone {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 24px 16px;
+    text-align: center;
+    background-color: var(--bg-subtle);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.sql-dropzone:hover, .sql-dropzone.dragover {
+    border-color: #38bdf8;
+    background-color: #f0f9ff;
+}
+
+.backup-table-wrapper {
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.backup-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+}
+
+.backup-table th {
+    background-color: var(--bg-subtle);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.backup-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-body);
+}
+
+.backup-table tr:last-child td {
+    border-bottom: none;
+}
+
+.backup-table tr:hover td {
+    background-color: var(--bg-hover);
+}
+
+.btn-icon-xs {
+    padding: 4px 8px;
+    font-size: 11.5px;
+}
+
 .hidden {
     display: none !important;
 }
