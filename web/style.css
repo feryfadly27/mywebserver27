@@ -373,13 +373,14 @@ body {
 
 .quick-links-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
+    width: 100%;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
     .quick-links-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -393,15 +394,19 @@ body {
     background-color: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    padding: 14px 16px;
+    padding: 12px 14px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     text-decoration: none;
     color: var(--text-body);
     box-shadow: var(--shadow-sm);
     transition: all 0.15s ease;
     cursor: pointer;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .access-tile:hover {
@@ -415,6 +420,7 @@ body {
     font-family: inherit;
     font-size: inherit;
     width: 100%;
+    min-width: 0;
 }
 
 .access-tile-icon {
@@ -435,16 +441,20 @@ body {
     flex-direction: column;
     flex: 1;
     min-width: 0;
+    overflow: hidden;
 }
 
 .access-tile-info strong {
     font-size: 13px;
     color: var(--text-main);
     font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .access-tile-info span {
-    font-size: 12px;
+    font-size: 11.5px;
     color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
@@ -455,6 +465,7 @@ body {
     color: var(--text-subtle);
     font-size: 14px;
     transition: transform 0.15s ease, color 0.15s ease;
+    flex-shrink: 0;
 }
 
 .access-tile:hover .access-tile-arrow {
