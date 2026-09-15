@@ -16,7 +16,17 @@ import (
 	"time"
 )
 
-const AppVersion = "v1.0.0"
+const AppVersion = "v1.1.0"
+
+type GitHubCommitInfo struct {
+	SHA    string `json:"sha"`
+	Commit struct {
+		Message string `json:"message"`
+		Author  struct {
+			Date time.Time `json:"date"`
+		} `json:"author"`
+	} `json:"commit"`
+}
 
 type GitHubAsset struct {
 	Name               string `json:"name"`
@@ -93,11 +103,65 @@ func CheckForUpdates(repo string, token string) (*UpdateCheckResult, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
+		// Fallback: Check latest commit from main branch
+		commitURL := fmt.Sprintf("https://api.github.com/repos/%s/commits/main", repo)
+		cReq, cErr := http.NewRequest(http.MethodGet, commitURL, nil)
+		if cErr == nil {
+			cReq.Header.Set("User-Agent", "MyLokalWebserver-Updater/"+AppVersion)
+			cReq.Header.Set("Accept", "application/vnd.github.v3+json")
+			if token != "" {
+				cReq.Header.Set("Authorization", "token "+token)
+			}
+			cResp, err2 := client.Do(cReq)
+			if err2 == nil && cResp.StatusCode == http.StatusOK {
+				defer cResp.Body.Close()
+				var commitInfo GitHubCommitInfo
+				if err3 := json.NewDecoder(cResp.Body).Decode(&commitInfo); err3 == nil {
+					shortSHA := commitInfo.SHA
+					if len(shortSHA) > 7 {
+						shortSHA = shortSHA[:7]
+					}
+					var rawURL, assetName string
+					switch runtime.GOOS {
+					case "windows":
+						rawURL = fmt.Sprintf("https://github.com/%s/raw/main/dist/windows/mylokalwebserver.exe", repo)
+						assetName = "mylokalwebserver.exe"
+					case "darwin":
+						if runtime.GOARCH == "arm64" {
+							rawURL = fmt.Sprintf("https://github.com/%s/raw/main/dist/macos-arm64/mylokalwebserver", repo)
+						} else {
+							rawURL = fmt.Sprintf("https://github.com/%s/raw/main/dist/macos-intel/mylokalwebserver", repo)
+						}
+						assetName = "mylokalwebserver"
+					case "linux":
+						rawURL = fmt.Sprintf("https://github.com/%s/raw/main/dist/linux-amd64/mylokalwebserver", repo)
+						assetName = "mylokalwebserver"
+					}
+
+					pubDate := ""
+					if !commitInfo.Commit.Author.Date.IsZero() {
+						pubDate = commitInfo.Commit.Author.Date.Format("02 Jan 2006, 15:04 MST")
+					}
+
+					return &UpdateCheckResult{
+						HasUpdate:      true,
+						CurrentVersion: AppVersion,
+						LatestVersion:  "main-" + shortSHA,
+						ReleaseName:    "Pembaruan Terkini (Branch Main)",
+						ReleaseNotes:   commitInfo.Commit.Message,
+						PublishedAt:    pubDate,
+						DownloadURL:    rawURL,
+						AssetName:      assetName,
+					}, nil
+				}
+			}
+		}
+
 		return &UpdateCheckResult{
 			HasUpdate:      false,
 			CurrentVersion: AppVersion,
 			LatestVersion:  AppVersion,
-			ReleaseNotes:   "Belum ada rilis versi publik di repository GitHub.",
+			ReleaseNotes:   "Aplikasi sudah menggunakan versi terbaru.",
 		}, nil
 	}
 
