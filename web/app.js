@@ -194,7 +194,7 @@ function setupEventListeners() {
         document.getElementById('inputApachePort').value = currentSettings.apache_port;
         document.getElementById('inputMariaDBPort').value = currentSettings.mariadb_port;
         document.getElementById('inputAutoStart').checked = currentSettings.auto_start;
-        document.getElementById('inputGitHubRepo').value = currentSettings.github_repo || 'fery/mylokalwebserver';
+        document.getElementById('inputGitHubRepo').value = currentSettings.github_repo || 'feryfadly27/mywebserver27';
         document.getElementById('inputGitHubToken').value = currentSettings.github_token || '';
         document.getElementById('inputAutoCheckUpdate').checked = currentSettings.auto_check_update !== false;
 

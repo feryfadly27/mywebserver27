@@ -62,7 +62,7 @@ var (
 
 func CheckForUpdates(repo string, token string) (*UpdateCheckResult, error) {
 	if repo == "" {
-		repo = "fery/mylokalwebserver"
+		repo = "feryfadly27/mywebserver27"
 	}
 	repo = strings.TrimPrefix(repo, "https://github.com/")
 	repo = strings.TrimSuffix(repo, "/")

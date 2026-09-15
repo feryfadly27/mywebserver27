@@ -38,7 +38,7 @@ func DefaultSettings() Settings {
 		PanelPort:       3000,
 		AutoStart:       true,
 		Shell:           "cmd",
-		GitHubRepo:      "fery/mylokalwebserver",
+		GitHubRepo:      "feryfadly27/mywebserver27",
 		AutoCheckUpdate: true,
 		VirtualHosts:    []VirtualHost{},
 	}
