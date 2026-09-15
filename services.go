@@ -45,19 +45,26 @@ func (sm *ServicesManager) StartApache() error {
 	defer sm.lock.Unlock()
 
 	settings := GetCurrentSettings()
+	exeExt := GetExecutableExt()
+
 	if sm.apacheCmd != nil && sm.apacheCmd.Process != nil {
 		if sm.IsPortOpen(settings.ApachePort) {
 			return nil // already running
 		}
 	} else if sm.IsPortOpen(settings.ApachePort) {
-		return fmt.Errorf("Port %d is already in use by another application. Please close the conflicting application or change Apache port in Settings.", settings.ApachePort)
+		// Clean up any orphan httpd processes from previous runs
+		KillByName("httpd" + exeExt)
+		KillByName("httpd")
+		time.Sleep(300 * time.Millisecond)
+		if sm.IsPortOpen(settings.ApachePort) {
+			return fmt.Errorf("Port %d is already in use by another application. Please close the conflicting application or change Apache port in Settings.", settings.ApachePort)
+		}
 	}
 
 	// Regenerate configs in case port changed
 	_ = GenerateApacheConfig(settings)
 	_ = GeneratePHPConfig(settings)
 
-	exeExt := GetExecutableExt()
 	apacheBin := filepath.Join(AppRootDir, "bin", "apache", "bin", "httpd"+exeExt)
 	if !fileExists(apacheBin) {
 		apacheBin = filepath.Join(AppRootDir, "bin", "apache", "bin", "httpd")
@@ -180,9 +187,21 @@ func (sm *ServicesManager) StartMariaDB() error {
 	defer sm.lock.Unlock()
 
 	settings := GetCurrentSettings()
+	exeExt := GetExecutableExt()
+
 	if sm.mariadbCmd != nil && sm.mariadbCmd.Process != nil {
 		if sm.IsPortOpen(settings.MariaDBPort) {
 			return nil // already running
+		}
+	} else if sm.IsPortOpen(settings.MariaDBPort) {
+		// Clean up any orphan mariadbd / mysqld processes from previous runs
+		KillByName("mariadbd" + exeExt)
+		KillByName("mysqld" + exeExt)
+		KillByName("mariadbd")
+		KillByName("mysqld")
+		time.Sleep(400 * time.Millisecond)
+		if sm.IsPortOpen(settings.MariaDBPort) {
+			return fmt.Errorf("Port %d is already in use by another application. Please close the conflicting application or change MariaDB port in Settings.", settings.MariaDBPort)
 		}
 	}
 
@@ -190,7 +209,6 @@ func (sm *ServicesManager) StartMariaDB() error {
 	_ = GenerateMariaDBConfig(settings)
 	_ = GeneratePhpMyAdminConfig(settings)
 
-	exeExt := GetExecutableExt()
 	mariadbBin := filepath.Join(AppRootDir, "bin", "mariadb", "bin", "mariadbd"+exeExt)
 	if !fileExists(mariadbBin) {
 		mariadbBin = filepath.Join(AppRootDir, "bin", "mariadb", "bin", "mysqld"+exeExt)
@@ -233,6 +251,24 @@ func (sm *ServicesManager) StartMariaDB() error {
 		}
 		sm.lock.Unlock()
 	}()
+
+	// Brief wait to ensure MariaDB hasn't crashed on boot
+	time.Sleep(600 * time.Millisecond)
+	sm.lock.Lock()
+	isExited := (sm.mariadbCmd == nil)
+	sm.lock.Unlock()
+
+	if isExited {
+		logBytes, _ := os.ReadFile(filepath.Join(logsDir, "mariadb_runner.log"))
+		combinedLogs := strings.TrimSpace(string(logBytes))
+		if len(combinedLogs) > 350 {
+			combinedLogs = combinedLogs[len(combinedLogs)-350:]
+		}
+		if combinedLogs != "" {
+			return fmt.Errorf("MariaDB stopped immediately after start: %s", combinedLogs)
+		}
+		return fmt.Errorf("MariaDB failed to start. Please check logs/mariadb_runner.log.")
+	}
 
 	return nil
 }
