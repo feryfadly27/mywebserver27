@@ -4,7 +4,7 @@
  */
 declare(strict_types=1);
 
-$cfg['blowfish_secret'] = '158ab4ea637fc3932da2fb9bacfdd263';
+$cfg['blowfish_secret'] = 'a81715552df30e7d3c3ef51bba6314ec';
 
 $i = 0;
 $i++;

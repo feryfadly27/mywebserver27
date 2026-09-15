@@ -57,6 +57,9 @@ func main() {
 	// Create starter page if empty
 	CreateStarterPage()
 
+	// Clean any leftover .old binary from previous update
+	CleanupOldBinary()
+
 	// Check if binaries are already installed
 	allInstalled, _ := CheckBinariesExist()
 	if allInstalled {
@@ -91,6 +94,9 @@ func main() {
 	mux.HandleFunc("/api/vhosts/toggle", HandleVHostToggle)
 	mux.HandleFunc("/api/shutdown", HandleShutdown)
 	mux.HandleFunc("/api/restart", HandleRestartApp)
+	mux.HandleFunc("/api/update/check", HandleCheckUpdate)
+	mux.HandleFunc("/api/update/apply", HandleApplyUpdate)
+	mux.HandleFunc("/api/update/progress", HandleUpdateProgress)
 	mux.HandleFunc("/ws/terminal", HandleTerminalWebSocket)
 
 	// Static Web Frontend (Embedded)

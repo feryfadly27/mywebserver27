@@ -37,6 +37,7 @@ func HandleStatus(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, APIResponse{
 		Success: true,
 		Data: map[string]any{
+			"app_version":        AppVersion,
 			"binaries_installed": allInstalled,
 			"binary_status":      binaryStatus,
 			"services":           servicesStatus,
@@ -699,5 +700,87 @@ func HandleRestartApp(w http.ResponseWriter, r *http.Request) {
 		Data:    Manager.GetStatus(),
 	})
 }
+
+func HandleCheckUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	settings := GetCurrentSettings()
+	repo := r.URL.Query().Get("repo")
+	if repo == "" {
+		repo = settings.GitHubRepo
+	}
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		token = settings.GitHubToken
+	}
+
+	res, err := CheckForUpdates(repo, token)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    res,
+	})
+}
+
+func HandleApplyUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		DownloadURL string `json:"download_url"`
+		Token       string `json:"token,omitempty"`
+	}
+
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	if req.DownloadURL == "" {
+		req.DownloadURL = r.URL.Query().Get("url")
+	}
+
+	if req.DownloadURL == "" {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Tautan unduhan tidak boleh kosong"})
+		return
+	}
+
+	settings := GetCurrentSettings()
+	if req.Token == "" {
+		req.Token = settings.GitHubToken
+	}
+
+	go func() {
+		_ = ApplySelfUpdate(req.DownloadURL, req.Token)
+	}()
+
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Message: "Proses pembaruan dimulai...",
+	})
+}
+
+func HandleUpdateProgress(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	prog := GetUpdateProgress()
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    prog,
+	})
+}
+
 
 

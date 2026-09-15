@@ -5,6 +5,7 @@
 *.so
 *.dylib
 bin/
+dist/
 
 # Runtime data & logs
 data/

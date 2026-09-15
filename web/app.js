@@ -11,6 +11,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
 });
 
+let hasCheckedAutoUpdate = false;
+let latestUpdateInfo = null;
+let updatePollInterval = null;
+
 function initApp() {
     fetchStatus();
     // Poll status every 3 seconds
@@ -25,6 +29,11 @@ async function fetchStatus() {
 
         const info = data.data;
         currentSettings = info.settings;
+
+        const verEl = document.getElementById('textAppVersion');
+        if (verEl && info.app_version) {
+            verEl.textContent = `${info.app_version} • Portable`;
+        }
 
         if (!info.binaries_installed) {
             document.getElementById('setupSection').classList.remove('hidden');
@@ -41,6 +50,12 @@ async function fetchStatus() {
             if (!isTerminalInitialized) {
                 initTerminal();
             }
+        }
+
+        // Trigger background update check once if enabled
+        if (!hasCheckedAutoUpdate && currentSettings && currentSettings.auto_check_update !== false) {
+            hasCheckedAutoUpdate = true;
+            checkForUpdates(false);
         }
     } catch (err) {
         console.error('Error fetching server status:', err);
@@ -179,6 +194,10 @@ function setupEventListeners() {
         document.getElementById('inputApachePort').value = currentSettings.apache_port;
         document.getElementById('inputMariaDBPort').value = currentSettings.mariadb_port;
         document.getElementById('inputAutoStart').checked = currentSettings.auto_start;
+        document.getElementById('inputGitHubRepo').value = currentSettings.github_repo || 'fery/mylokalwebserver';
+        document.getElementById('inputGitHubToken').value = currentSettings.github_token || '';
+        document.getElementById('inputAutoCheckUpdate').checked = currentSettings.auto_check_update !== false;
+
         const shellRadio = document.querySelector(`input[name="shell"][value="${currentSettings.shell || 'cmd'}"]`);
         if (shellRadio) shellRadio.checked = true;
 
@@ -189,6 +208,15 @@ function setupEventListeners() {
     document.getElementById('btnCloseSettings').addEventListener('click', () => modal.classList.add('hidden'));
     document.getElementById('btnCancelSettings').addEventListener('click', () => modal.classList.add('hidden'));
 
+    document.getElementById('btnCheckUpdateFromSettings').addEventListener('click', () => {
+        modal.classList.add('hidden');
+        checkForUpdates(true);
+    });
+
+    document.getElementById('btnCheckUpdateTop').addEventListener('click', () => {
+        checkForUpdates(true);
+    });
+
     document.getElementById('settingsForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const alertEl = document.getElementById('settingsAlert');
@@ -198,6 +226,9 @@ function setupEventListeners() {
         const mariadbPort = parseInt(document.getElementById('inputMariaDBPort').value, 10);
         const autoStart = document.getElementById('inputAutoStart').checked;
         const shell = document.querySelector('input[name="shell"]:checked').value;
+        const githubRepo = document.getElementById('inputGitHubRepo').value.trim();
+        const githubToken = document.getElementById('inputGitHubToken').value.trim();
+        const autoCheckUpdate = document.getElementById('inputAutoCheckUpdate').checked;
 
         try {
             const res = await fetch('/api/settings', {
@@ -207,7 +238,10 @@ function setupEventListeners() {
                     apache_port: apachePort,
                     mariadb_port: mariadbPort,
                     auto_start: autoStart,
-                    shell: shell
+                    shell: shell,
+                    github_repo: githubRepo,
+                    github_token: githubToken,
+                    auto_check_update: autoCheckUpdate
                 })
             });
 
@@ -230,6 +264,19 @@ function setupEventListeners() {
             alertEl.textContent = 'Error: ' + err.message;
             alertEl.classList.remove('hidden');
         }
+    });
+
+    // Update Modal Controls
+    const updateModal = document.getElementById('updateModal');
+    document.getElementById('btnCloseUpdateModal').addEventListener('click', () => updateModal.classList.add('hidden'));
+    document.getElementById('btnCancelUpdate').addEventListener('click', () => updateModal.classList.add('hidden'));
+
+    document.getElementById('btnApplyUpdate').addEventListener('click', async () => {
+        if (!latestUpdateInfo || !latestUpdateInfo.download_url) {
+            alert('Tautan unduhan rilis tidak ditemukan.');
+            return;
+        }
+        await applyUpdate(latestUpdateInfo.download_url);
     });
 
     // New Project Modal & Form
@@ -845,5 +892,154 @@ function openVHostModalForProject(folderName, hasPublicDir) {
 
     vhostModal.classList.remove('hidden');
     document.getElementById('inputVHostDomain').focus();
+}
+
+async function checkForUpdates(interactive) {
+    const updateModal = document.getElementById('updateModal');
+    const checkingView = document.getElementById('updateCheckingView');
+    const upToDateView = document.getElementById('updateUpToDateView');
+    const availableView = document.getElementById('updateAvailableView');
+    const errorView = document.getElementById('updateErrorView');
+    const btnApply = document.getElementById('btnApplyUpdate');
+    const notifDot = document.getElementById('updateNotificationDot');
+
+    if (interactive) {
+        checkingView.classList.remove('hidden');
+        upToDateView.classList.add('hidden');
+        availableView.classList.add('hidden');
+        errorView.classList.add('hidden');
+        btnApply.classList.add('hidden');
+        document.getElementById('updateAlert').classList.add('hidden');
+        document.getElementById('updateProgressContainer').classList.add('hidden');
+        updateModal.classList.remove('hidden');
+    }
+
+    try {
+        const repoParam = currentSettings && currentSettings.github_repo ? `?repo=${encodeURIComponent(currentSettings.github_repo)}` : '';
+        const res = await fetch(`/api/update/check${repoParam}`);
+        const data = await res.json();
+
+        if (!data.success) {
+            if (interactive) {
+                checkingView.classList.add('hidden');
+                document.getElementById('updateErrorMsg').textContent = data.error || 'Gagal memeriksa rilis GitHub';
+                errorView.classList.remove('hidden');
+            }
+            return;
+        }
+
+        const info = data.data;
+        latestUpdateInfo = info;
+
+        if (info.has_update) {
+            if (notifDot) notifDot.classList.remove('hidden');
+
+            if (interactive) {
+                checkingView.classList.add('hidden');
+                document.getElementById('updateCurVer').textContent = info.current_version;
+                document.getElementById('updateLatestVer').textContent = info.latest_version;
+                document.getElementById('updateReleaseDate').textContent = info.published_at ? `Dirilis: ${info.published_at}` : '';
+                document.getElementById('updateFileSize').textContent = info.asset_size_str || '~7.2 MB';
+                document.getElementById('updateReleaseNotes').textContent = info.release_notes || 'Tidak ada catatan rilis.';
+                
+                availableView.classList.remove('hidden');
+                btnApply.classList.remove('hidden');
+            }
+        } else {
+            if (notifDot) notifDot.classList.add('hidden');
+
+            if (interactive) {
+                checkingView.classList.add('hidden');
+                document.getElementById('upToDateVer').textContent = info.current_version;
+                upToDateView.classList.remove('hidden');
+            }
+        }
+    } catch (err) {
+        if (interactive) {
+            checkingView.classList.add('hidden');
+            document.getElementById('updateErrorMsg').textContent = 'Koneksi error: ' + err.message;
+            errorView.classList.remove('hidden');
+        }
+    }
+}
+
+async function applyUpdate(downloadURL) {
+    const btnApply = document.getElementById('btnApplyUpdate');
+    const alertEl = document.getElementById('updateAlert');
+    const progressContainer = document.getElementById('updateProgressContainer');
+    const progressBar = document.getElementById('updateProgressBar');
+    const progressText = document.getElementById('updateProgressText');
+    const progressPercent = document.getElementById('updateProgressPercent');
+
+    btnApply.disabled = true;
+    btnApply.textContent = 'Memproses...';
+    alertEl.classList.add('hidden');
+    progressContainer.classList.remove('hidden');
+
+    try {
+        const res = await fetch('/api/update/apply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                download_url: downloadURL
+            })
+        });
+
+        const data = await res.json();
+        if (!data.success) {
+            alertEl.className = 'modal-alert alert-error';
+            alertEl.textContent = data.error || 'Gagal memulai proses pembaruan';
+            alertEl.classList.remove('hidden');
+            btnApply.disabled = false;
+            btnApply.textContent = 'Perbarui Sekarang (1-Klik)';
+            return;
+        }
+
+        // Poll update progress
+        if (updatePollInterval) clearInterval(updatePollInterval);
+        updatePollInterval = setInterval(async () => {
+            try {
+                const pRes = await fetch('/api/update/progress');
+                const pData = await pRes.json();
+                if (pData.success && pData.data) {
+                    const p = pData.data;
+                    progressBar.style.width = `${p.progress}%`;
+                    progressPercent.textContent = `${p.progress}%`;
+                    progressText.textContent = p.message || 'Mengunduh...';
+
+                    if (p.status === 'completed') {
+                        clearInterval(updatePollInterval);
+                        alertEl.className = 'modal-alert alert-success';
+                        alertEl.textContent = 'Pembaruan berhasil dipasang! Server sedang memuat ulang...';
+                        alertEl.classList.remove('hidden');
+
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2500);
+                    } else if (p.status === 'error') {
+                        clearInterval(updatePollInterval);
+                        alertEl.className = 'modal-alert alert-error';
+                        alertEl.textContent = p.error || 'Terjadi kesalahan saat pembaruan';
+                        alertEl.classList.remove('hidden');
+                        btnApply.disabled = false;
+                        btnApply.textContent = 'Coba Lagi';
+                    }
+                }
+            } catch (e) {
+                // Server might be restarting after update
+                clearInterval(updatePollInterval);
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+            }
+        }, 800);
+
+    } catch (err) {
+        alertEl.className = 'modal-alert alert-error';
+        alertEl.textContent = 'Error: ' + err.message;
+        alertEl.classList.remove('hidden');
+        btnApply.disabled = false;
+        btnApply.textContent = 'Perbarui Sekarang (1-Klik)';
+    }
 }
 

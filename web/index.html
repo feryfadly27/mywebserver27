@@ -27,32 +27,40 @@
                     </div>
                     <div class="app-title-group">
                         <span class="app-title">MyLokalWebserver</span>
-                        <span class="app-version">v1.0 &bull; Portable</span>
+                        <span class="app-version" id="textAppVersion">v1.0.0 &bull; Portable</span>
                     </div>
                 </div>
             </div>
 
             <div class="topbar-right">
+                <button id="btnCheckUpdateTop" class="btn btn-default btn-icon-label" title="Periksa pembaruan versi baru dari GitHub">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                    <span>Update</span>
+                    <span id="updateNotificationDot" class="update-badge-dot hidden"></span>
+                </button>
                 <button id="btnOpenNativeTerminalTop" class="btn btn-default" title="Buka terminal bawaan Windows di folder htdocs">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="4 17 10 11 4 5"></polyline>
                         <line x1="12" y1="19" x2="20" y2="19"></line>
                     </svg>
-                    <span>Terminal Windows</span>
+                    <span>Terminal</span>
                 </button>
-                <button id="btnOpenHtdocs" class="btn btn-default" title="Buka folder www/htdocs di Explorer">
+                <button id="btnOpenHtdocs" class="btn btn-default" title="Buka folder www/htdocs di Explorer / Finder">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                     </svg>
                     <span>Folder htdocs</span>
                 </button>
-                <button id="btnSettings" class="btn btn-default btn-icon-only" title="Pengaturan Port & Shell">
+                <button id="btnSettings" class="btn btn-default btn-icon-only" title="Pengaturan Server & Pembaruan">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="3"></circle>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                     </svg>
                 </button>
-                <button id="btnShutdown" class="btn btn-danger-ghost" title="Matikan Apache, MariaDB, dan matikan MyLokalWebserver">
+                <button id="btnShutdown" class="btn btn-danger-ghost" title="Kontrol Daya & Matikan Server">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
                         <line x1="12" y1="2" x2="12" y2="12"></line>
@@ -381,6 +389,35 @@
                     </label>
                 </div>
 
+                <div class="settings-divider"></div>
+                <div class="settings-subtitle">Pembaruan Aplikasi (GitHub)</div>
+
+                <div class="form-row">
+                    <label for="inputGitHubRepo">Repository GitHub</label>
+                    <input type="text" id="inputGitHubRepo" placeholder="username/repository" class="form-input font-mono">
+                    <span class="form-hint">Contoh: <code>fery/mylokalwebserver</code></span>
+                </div>
+
+                <div class="form-row">
+                    <label for="inputGitHubToken">Personal Access Token (Opsional)</label>
+                    <input type="password" id="inputGitHubToken" placeholder="ghp_xxxxxxxxxxxx" class="form-input font-mono">
+                    <span class="form-hint">Hanya diisi jika repositori GitHub bersifat Private/Pribadi</span>
+                </div>
+
+                <div class="form-row form-row-checkbox">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="inputAutoCheckUpdate" checked>
+                        <span>Periksa rilis versi baru otomatis saat dashboard dibuka</span>
+                    </label>
+                </div>
+
+                <div class="form-row">
+                    <button type="button" id="btnCheckUpdateFromSettings" class="btn btn-subtle btn-block" style="justify-content: center;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        <span>Periksa Pembaruan Sekarang</span>
+                    </button>
+                </div>
+
                 <div id="settingsAlert" class="modal-alert hidden"></div>
 
                 <div class="modal-actions">
@@ -508,6 +545,96 @@
 
                 <div class="modal-actions">
                     <button type="button" id="btnCloseHostsHelperBottom" class="btn btn-primary">Saya Mengerti</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Check / Application Updater Modal -->
+    <div id="updateModal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-head">
+                <div class="modal-title-with-icon">
+                    <span class="modal-icon-badge accent" id="updateIconBadge">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                    </span>
+                    <h3 id="updateModalTitle">Pembaruan Aplikasi</h3>
+                </div>
+                <button id="btnCloseUpdateModal" class="modal-close" aria-label="Tutup">&times;</button>
+            </div>
+            <div class="modal-content-body">
+                <div id="updateCheckingView" class="update-view">
+                    <div class="spinner-inline"></div>
+                    <span>Memeriksa rilis terbaru di GitHub...</span>
+                </div>
+
+                <div id="updateUpToDateView" class="update-view hidden">
+                    <div class="update-status-icon success">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </div>
+                    <h4>Aplikasi Anda Sudah Menggunakan Versi Terbaru</h4>
+                    <p>Versi aktif saat ini: <strong id="upToDateVer" class="font-mono">v1.0.0</strong></p>
+                </div>
+
+                <div id="updateAvailableView" class="update-view hidden">
+                    <div class="update-version-card">
+                        <div class="version-compare">
+                            <div class="ver-box current">
+                                <span class="ver-label">Versi Saat Ini</span>
+                                <strong id="updateCurVer" class="font-mono">v1.0.0</strong>
+                            </div>
+                            <div class="ver-arrow">&rarr;</div>
+                            <div class="ver-box latest">
+                                <span class="ver-label">Versi Baru Tersedia</span>
+                                <strong id="updateLatestVer" class="font-mono">v1.1.0</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="update-meta-row">
+                        <span id="updateReleaseDate">Dirilis: -</span>
+                        <span id="updateFileSize" class="font-mono tag tag-neutral">~7.2 MB</span>
+                    </div>
+
+                    <div class="form-row" style="margin-top: 12px;">
+                        <label>Catatan Rilis / Fitur Baru:</label>
+                        <div id="updateReleaseNotes" class="release-notes-box"></div>
+                    </div>
+
+                    <div id="updateProgressContainer" class="progress-wrapper hidden" style="margin-top: 14px;">
+                        <div class="progress-bar-track">
+                            <div id="updateProgressBar" class="progress-bar-thumb" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-meta">
+                            <span id="updateProgressText">Mengunduh pembaruan...</span>
+                            <span id="updateProgressPercent" class="font-mono">0%</span>
+                        </div>
+                    </div>
+
+                    <div id="updateAlert" class="modal-alert hidden"></div>
+                </div>
+
+                <div id="updateErrorView" class="update-view hidden">
+                    <div class="update-status-icon danger">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    </div>
+                    <h4>Gagal Memeriksa Pembaruan</h4>
+                    <p id="updateErrorMsg">Tidak dapat menghubungi GitHub API.</p>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 18px;">
+                    <button type="button" id="btnCancelUpdate" class="btn btn-subtle">Tutup</button>
+                    <button type="button" id="btnApplyUpdate" class="btn btn-primary hidden">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>Perbarui Sekarang (1-Klik)</span>
+                    </button>
                 </div>
             </div>
         </div>

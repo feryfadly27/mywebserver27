@@ -15,12 +15,15 @@ type VirtualHost struct {
 }
 
 type Settings struct {
-	ApachePort   int           `json:"apache_port"`
-	MariaDBPort  int           `json:"mariadb_port"`
-	PanelPort    int           `json:"panel_port"`
-	AutoStart    bool          `json:"auto_start"`
-	Shell        string        `json:"shell"` // "cmd" or "powershell"
-	VirtualHosts []VirtualHost `json:"virtual_hosts,omitempty"`
+	ApachePort      int           `json:"apache_port"`
+	MariaDBPort     int           `json:"mariadb_port"`
+	PanelPort       int           `json:"panel_port"`
+	AutoStart       bool          `json:"auto_start"`
+	Shell           string        `json:"shell"` // "cmd" or "powershell"
+	GitHubRepo      string        `json:"github_repo,omitempty"`
+	GitHubToken     string        `json:"github_token,omitempty"`
+	AutoCheckUpdate bool          `json:"auto_check_update"`
+	VirtualHosts    []VirtualHost `json:"virtual_hosts,omitempty"`
 }
 
 var (
@@ -30,12 +33,14 @@ var (
 
 func DefaultSettings() Settings {
 	return Settings{
-		ApachePort:   8080,
-		MariaDBPort:  3307,
-		PanelPort:    3000,
-		AutoStart:    true,
-		Shell:        "cmd",
-		VirtualHosts: []VirtualHost{},
+		ApachePort:      8080,
+		MariaDBPort:     3307,
+		PanelPort:       3000,
+		AutoStart:       true,
+		Shell:           "cmd",
+		GitHubRepo:      "fery/mylokalwebserver",
+		AutoCheckUpdate: true,
+		VirtualHosts:    []VirtualHost{},
 	}
 }
 
