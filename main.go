@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -29,7 +30,17 @@ func main() {
 	if err != nil {
 		AppRootDir, _ = os.Getwd()
 	} else {
-		AppRootDir = filepath.Dir(exePath)
+		exeDir := filepath.Dir(exePath)
+		if strings.Contains(exeDir, ".app/Contents/MacOS") || strings.Contains(exeDir, ".app\\Contents\\MacOS") {
+			cwd, _ := os.Getwd()
+			if cwd != "" && !strings.Contains(cwd, ".app/Contents") {
+				AppRootDir = cwd
+			} else {
+				AppRootDir = filepath.Clean(filepath.Join(exeDir, "..", "..", ".."))
+			}
+		} else {
+			AppRootDir = exeDir
+		}
 	}
 
 	log.Printf("==================================================")
