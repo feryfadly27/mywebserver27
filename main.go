@@ -110,6 +110,10 @@ func main() {
 	mux.HandleFunc("/api/update/progress", HandleUpdateProgress)
 	mux.HandleFunc("/ws/terminal", HandleTerminalWebSocket)
 
+	// Virtual Hosts & Windows Hosts File Sync
+	mux.HandleFunc("/api/hosts/status", HandleHostsStatus)
+	mux.HandleFunc("/api/hosts/sync", HandleHostsSync)
+
 	// Network LAN IP & QR Sharing
 	mux.HandleFunc("/api/network/ips", HandleNetworkIPs)
 

@@ -173,9 +173,22 @@ func GenerateVhostsConfig(settings Settings) error {
 
 		_ = os.MkdirAll(docRoot, 0755)
 
+		aliases := []string{"www." + vh.Domain}
+		parts := strings.Split(vh.Domain, ".")
+		prefix := parts[0]
+		if prefix != "" {
+			aliases = append(aliases,
+				prefix+".localtest.me",
+				"www."+prefix+".localtest.me",
+				prefix+".127.0.0.1.nip.io",
+				prefix+".localhost",
+				"www."+prefix+".localhost",
+			)
+		}
+
 		sb.WriteString(fmt.Sprintf(`<VirtualHost *:%d>
     ServerName %s
-    ServerAlias www.%s
+    ServerAlias %s
     DocumentRoot "%s"
     <Directory "%s">
         Options Indexes FollowSymLinks MultiViews
@@ -186,7 +199,7 @@ func GenerateVhostsConfig(settings Settings) error {
     ErrorLog "%s/error_%s.log"
 </VirtualHost>
 
-`, settings.ApachePort, vh.Domain, vh.Domain, toApachePath(docRoot), toApachePath(docRoot), toApachePath(logsDir), sanitizeFilename(vh.Domain), toApachePath(logsDir), sanitizeFilename(vh.Domain)))
+`, settings.ApachePort, vh.Domain, strings.Join(aliases, " "), toApachePath(docRoot), toApachePath(docRoot), toApachePath(logsDir), sanitizeFilename(vh.Domain), toApachePath(logsDir), sanitizeFilename(vh.Domain)))
 	}
 
 	confDir := filepath.Join(apacheDir, "conf")

@@ -289,15 +289,17 @@ func HandleOpenNativeTerminal(w http.ResponseWriter, r *http.Request) {
 }
 
 type ProjectInfo struct {
-	Name         string `json:"name"`
-	RelativePath string `json:"relative_path"`
-	FullPath     string `json:"full_path"`
-	Framework    string `json:"framework"`
-	HasPublicDir bool   `json:"has_public_dir"`
-	DefaultURL   string `json:"default_url"`
-	VHostDomain  string `json:"vhost_domain,omitempty"`
-	VHostURL     string `json:"vhost_url,omitempty"`
-	VHostEnabled bool   `json:"vhost_enabled"`
+	Name          string `json:"name"`
+	RelativePath  string `json:"relative_path"`
+	FullPath      string `json:"full_path"`
+	Framework     string `json:"framework"`
+	HasPublicDir  bool   `json:"has_public_dir"`
+	DefaultURL    string `json:"default_url"`
+	VHostDomain   string `json:"vhost_domain,omitempty"`
+	VHostURL      string `json:"vhost_url,omitempty"`
+	LocalhostURL  string `json:"localhost_url,omitempty"`
+	VHostEnabled  bool   `json:"vhost_enabled"`
+	IsInHostsFile bool   `json:"is_in_hosts_file"`
 }
 
 func detectFramework(dir string) (string, bool) {
@@ -370,7 +372,15 @@ func HandleProjects(w http.ResponseWriter, r *http.Request) {
 				if strings.HasPrefix(cleanFolder, folderName) || cleanFolder == folderName {
 					pInfo.VHostDomain = vh.Domain
 					pInfo.VHostEnabled = vh.Enabled
-					pInfo.VHostURL = fmt.Sprintf("http://%s:%d", vh.Domain, settings.ApachePort)
+					pInfo.VHostURL = fmt.Sprintf("http://%s:%d/", vh.Domain, settings.ApachePort)
+					pInfo.IsInHostsFile = CheckDomainInHosts(vh.Domain)
+
+					parts := strings.Split(vh.Domain, ".")
+					prefix := parts[0]
+					if prefix == "" {
+						prefix = folderName
+					}
+					pInfo.LocalhostURL = fmt.Sprintf("http://%s.localtest.me:%d/", prefix, settings.ApachePort)
 					break
 				}
 			}
@@ -987,6 +997,69 @@ func HandleDatabaseDeleteBackup(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, APIResponse{
 		Success: true,
 		Message: "File backup berhasil dihapus",
+	})
+}
+
+func HandleHostsStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	settings := GetCurrentSettings()
+	var allDomains []string
+	for _, vh := range settings.VirtualHosts {
+		if vh.Enabled && strings.TrimSpace(vh.Domain) != "" {
+			allDomains = append(allDomains, vh.Domain)
+		}
+	}
+
+	missing := GetMissingHostsDomains(allDomains)
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data: map[string]any{
+			"hosts_file":    GetHostsFilePath(),
+			"all_domains":   allDomains,
+			"missing":       missing,
+			"is_all_synced": len(missing) == 0,
+		},
+	})
+}
+
+func HandleHostsSync(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	settings := GetCurrentSettings()
+	var allDomains []string
+	for _, vh := range settings.VirtualHosts {
+		if vh.Enabled && strings.TrimSpace(vh.Domain) != "" {
+			allDomains = append(allDomains, vh.Domain)
+		}
+	}
+
+	if len(allDomains) == 0 {
+		jsonResponse(w, http.StatusOK, APIResponse{
+			Success: true,
+			Message: "Tidak ada domain Virtual Host yang perlu disinkronkan.",
+		})
+		return
+	}
+
+	err := SyncDomainsToHosts(allDomains)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Error:   fmt.Sprintf("Gagal menyinkronkan hosts: %v", err),
+		})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Message: "Domain berhasil disinkronkan ke file hosts Windows!",
 	})
 }
 

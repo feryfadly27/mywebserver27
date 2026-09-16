@@ -621,6 +621,28 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    text-decoration: none;
+}
+
+.badge-vhost-pending {
+    background-color: #fffbeb;
+    color: #b45309;
+    border: 1px solid #fde68a;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.badge-localhost {
+    background-color: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    text-decoration: none;
 }
 
 .project-links-row {

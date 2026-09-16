@@ -459,13 +459,16 @@ function setupEventListeners() {
         }
     });
 
-    // Hosts File Helper Modal
+    // Hosts File Helper Modal & 1-Click Sync
     const hostsModal = document.getElementById('hostsHelperModal');
-    document.getElementById('btnHostsHelper').addEventListener('click', () => {
-        hostsModal.classList.remove('hidden');
-    });
+    document.getElementById('btnHostsHelper').addEventListener('click', openHostsModal);
     document.getElementById('btnCloseHostsHelper').addEventListener('click', () => hostsModal.classList.add('hidden'));
     document.getElementById('btnCloseHostsHelperBottom').addEventListener('click', () => hostsModal.classList.add('hidden'));
+    
+    const btnSyncHosts = document.getElementById('btnSyncHosts1Click');
+    if (btnSyncHosts) {
+        btnSyncHosts.addEventListener('click', syncHostsFile);
+    }
 
     // Batch Services Controls (Header bar)
     const btnStartAll = document.getElementById('btnStartAllServices');
@@ -848,13 +851,33 @@ function renderProjects(projects, apachePort) {
 
         let vhostBadge = '';
         if (p.vhost_domain) {
-            vhostBadge = `
-                <a href="${p.vhost_url}" target="_blank" class="badge-fw badge-vhost" title="Domain Virtual Host aktif: ${p.vhost_domain}">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-                    <span>${escapeHTML(p.vhost_domain)}</span>
-                </a>
-            `;
+            if (p.is_in_hosts_file) {
+                vhostBadge = `
+                    <a href="${p.vhost_url}" target="_blank" class="badge-fw badge-vhost" title="Domain Virtual Host aktif dan terdaftar di Hosts Windows: ${p.vhost_domain}">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                        <span>${escapeHTML(p.vhost_domain)}</span>
+                    </a>
+                `;
+            } else {
+                vhostBadge = `
+                    <span onclick="openHostsModal()" class="badge-fw badge-vhost-pending" title="Domain belum terdaftar di Windows hosts. Klik untuk Sinkronkan 1-Klik">
+                        <span>⚠️ ${escapeHTML(p.vhost_domain)}</span>
+                        <span style="font-size: 10px; text-decoration: underline; margin-left: 2px;">(Sync Hosts)</span>
+                    </span>
+                `;
+            }
+
+            if (p.localhost_url) {
+                const domainLabel = p.localhost_url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+                vhostBadge += `
+                    <a href="${p.localhost_url}" target="_blank" class="badge-fw badge-localhost" title="Domain instan lokal (Langsung aktif di browser tanpa perlu edit file hosts)">
+                        <span>⚡ ${escapeHTML(domainLabel)}</span>
+                    </a>
+                `;
+            }
         }
+
+        const openUrl = p.vhost_url && p.is_in_hosts_file ? p.vhost_url : (p.localhost_url || p.default_url);
 
         return `
             <div class="project-card">
@@ -873,7 +896,7 @@ function renderProjects(projects, apachePort) {
                     </div>
                 </div>
                 <div class="project-actions">
-                    <a href="${p.vhost_url || p.default_url}" target="_blank" class="btn btn-default btn-icon-label" title="Buka website">
+                    <a href="${openUrl}" target="_blank" class="btn btn-default btn-icon-label" title="Buka website">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
                         <span>Buka</span>
                     </a>
@@ -897,6 +920,58 @@ function renderProjects(projects, apachePort) {
             </div>
         `;
     }).join('');
+}
+
+async function openHostsModal() {
+    const hostsModal = document.getElementById('hostsHelperModal');
+    const alertEl = document.getElementById('hostsSyncAlert');
+    if (alertEl) alertEl.classList.add('hidden');
+
+    try {
+        const res = await fetch('/api/hosts/status');
+        const data = await res.json();
+        if (data.success) {
+            const samplePre = document.getElementById('hostsSampleCode');
+            if (samplePre && data.data.all_domains && data.data.all_domains.length > 0) {
+                samplePre.textContent = data.data.all_domains.map(d => `127.0.0.1  ${d}\n127.0.0.1  www.${d}`).join('\n');
+            }
+        }
+    } catch (e) {
+        console.error('Error checking hosts status:', e);
+    }
+    hostsModal.classList.remove('hidden');
+}
+
+async function syncHostsFile() {
+    const btn = document.getElementById('btnSyncHosts1Click');
+    const txt = document.getElementById('textBtnSyncHosts');
+    const alertEl = document.getElementById('hostsSyncAlert');
+
+    if (btn) btn.disabled = true;
+    if (txt) txt.textContent = 'Menyinkronkan (Periksa UAC)...';
+    if (alertEl) alertEl.classList.add('hidden');
+
+    try {
+        const res = await fetch('/api/hosts/sync', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            alertEl.className = 'modal-alert alert-success';
+            alertEl.textContent = '✅ Berhasil! Domain telah ditambahkan ke berkas hosts Windows.';
+            alertEl.classList.remove('hidden');
+            fetchProjects();
+        } else {
+            alertEl.className = 'modal-alert alert-danger';
+            alertEl.textContent = `❌ ${data.error || 'Gagal menyinkronkan hosts'}`;
+            alertEl.classList.remove('hidden');
+        }
+    } catch (err) {
+        alertEl.className = 'modal-alert alert-danger';
+        alertEl.textContent = `❌ Error: ${err.message}`;
+        alertEl.classList.remove('hidden');
+    } finally {
+        if (btn) btn.disabled = false;
+        if (txt) txt.textContent = 'Sinkronkan ke Windows Hosts (1-Klik)';
+    }
 }
 
 function escapeHTML(str) {

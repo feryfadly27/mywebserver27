@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MyLokalWebserver</title>
-    <link rel="stylesheet" href="/style.css?v=1.1.0">
+    <link rel="stylesheet" href="/style.css?v=1.1.2">
     <!-- xterm.js CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
@@ -566,8 +566,20 @@
                     </div>
                 </div>
 
-                <div class="modal-actions">
-                    <button type="button" id="btnCloseHostsHelperBottom" class="btn btn-primary">Saya Mengerti</button>
+                <div class="form-row" style="margin-top: 14px;">
+                    <button type="button" id="btnSyncHosts1Click" class="btn btn-primary btn-block" style="justify-content: center;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg>
+                        <span id="textBtnSyncHosts">Sinkronkan ke Windows Hosts (1-Klik)</span>
+                    </button>
+                    <span class="form-hint" style="text-align: center; display: block; margin-top: 4px;">Klik "Yes" saat muncul konfirmasi Administrator (UAC) Windows.</span>
+                </div>
+
+                <div id="hostsSyncAlert" class="modal-alert hidden" style="margin-top: 10px;"></div>
+
+                <div class="modal-actions" style="margin-top: 14px;">
+                    <button type="button" id="btnCloseHostsHelperBottom" class="btn btn-subtle" style="width: 100%;">Tutup</button>
                 </div>
             </div>
         </div>
@@ -904,6 +916,6 @@
         </div>
     </div>
 
-    <script src="/app.js?v=1.1.0"></script>
+    <script src="/app.js?v=1.1.2"></script>
 </body>
 </html>
