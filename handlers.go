@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -1188,3 +1189,301 @@ func HandleDatabaseSeedTemplate(w http.ResponseWriter, r *http.Request) {
 		Message: fmt.Sprintf("Template database '%s' berhasil dibuat dan diisi data contoh pada database '%s'!", req.Template, req.Database),
 	})
 }
+
+func HandleDatabaseCreateQuick(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	var req QuickDatabaseCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Format JSON tidak valid: " + err.Error()})
+		return
+	}
+
+	req.DatabaseName = strings.TrimSpace(req.DatabaseName)
+	if req.DatabaseName == "" {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Nama database tidak boleh kosong"})
+		return
+	}
+	if len(req.Tables) == 0 {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Minimal buat 1 tabel dalam database"})
+		return
+	}
+
+	if err := CreateQuickDatabase(req); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	seedMsg := ""
+	if req.SeedSampleData {
+		seedMsg = fmt.Sprintf(" dan otomatis diisi %d data contoh", req.SeedCount)
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Message: fmt.Sprintf("Database '%s' dengan %d tabel berhasil dibuat%s!", req.DatabaseName, len(req.Tables), seedMsg),
+		Data: map[string]any{
+			"database":     req.DatabaseName,
+			"tables_count": len(req.Tables),
+		},
+	})
+}
+
+// Database Editor API Handlers
+
+func HandleDatabaseTableData(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	dbName := strings.TrimSpace(r.URL.Query().Get("db"))
+	tableName := strings.TrimSpace(r.URL.Query().Get("table"))
+	search := strings.TrimSpace(r.URL.Query().Get("search"))
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+
+	if dbName == "" || tableName == "" {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Parameter db dan table wajib diisi"})
+		return
+	}
+
+	res, err := GetTableData(dbName, tableName, search, page, limit)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{Success: true, Data: res})
+}
+
+func HandleDatabaseInsertRow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		Database string         `json:"database"`
+		Table    string         `json:"table"`
+		Row      map[string]any `json:"row"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Format JSON tidak valid: " + err.Error()})
+		return
+	}
+
+	if err := InsertTableRow(req.Database, req.Table, req.Row); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{Success: true, Message: "Data baris baru berhasil disimpan!"})
+}
+
+func HandleDatabaseUpdateRow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		Database string         `json:"database"`
+		Table    string         `json:"table"`
+		PkColumn string         `json:"pk_column"`
+		PkValue  any            `json:"pk_value"`
+		Row      map[string]any `json:"row"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Format JSON tidak valid: " + err.Error()})
+		return
+	}
+
+	if err := UpdateTableRow(req.Database, req.Table, req.PkColumn, req.PkValue, req.Row); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{Success: true, Message: "Perubahan data berhasil disimpan!"})
+}
+
+func HandleDatabaseDeleteRow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		Database string `json:"database"`
+		Table    string `json:"table"`
+		PkColumn string `json:"pk_column"`
+		PkValue  any    `json:"pk_value"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Format JSON tidak valid: " + err.Error()})
+		return
+	}
+
+	if err := DeleteTableRow(req.Database, req.Table, req.PkColumn, req.PkValue); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{Success: true, Message: "Baris data berhasil dihapus!"})
+}
+
+func HandleDatabaseAlterColumn(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		Database string         `json:"database"`
+		Table    string         `json:"table"`
+		Action   string         `json:"action"` // add, modify, drop
+		Column   QuickColumnDef `json:"column"`
+		OldName  string         `json:"old_name"`
+		AfterCol string         `json:"after_col"`
+		IsFirst  bool           `json:"is_first"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Format JSON tidak valid: " + err.Error()})
+		return
+	}
+
+	switch strings.ToLower(req.Action) {
+	case "add":
+		if err := AddTableColumn(req.Database, req.Table, req.Column, req.AfterCol, req.IsFirst); err != nil {
+			jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+			return
+		}
+		jsonResponse(w, http.StatusOK, APIResponse{Success: true, Message: fmt.Sprintf("Kolom '%s' berhasil ditambahkan!", req.Column.Name)})
+
+	case "modify":
+		if err := ModifyTableColumn(req.Database, req.Table, req.OldName, req.Column); err != nil {
+			jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+			return
+		}
+		jsonResponse(w, http.StatusOK, APIResponse{Success: true, Message: fmt.Sprintf("Kolom '%s' berhasil diperbarui!", req.Column.Name)})
+
+	case "drop":
+		colToDrop := req.Column.Name
+		if colToDrop == "" {
+			colToDrop = req.OldName
+		}
+		if err := DropTableColumn(req.Database, req.Table, colToDrop); err != nil {
+			jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+			return
+		}
+		jsonResponse(w, http.StatusOK, APIResponse{Success: true, Message: fmt.Sprintf("Kolom '%s' berhasil dihapus!", colToDrop)})
+
+	default:
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Aksi kolom tidak valid (pilih add, modify, atau drop)"})
+	}
+}
+
+func HandleDatabaseDropTable(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		Database string `json:"database"`
+		Table    string `json:"table"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Format JSON tidak valid: " + err.Error()})
+		return
+	}
+
+	if err := DropTable(req.Database, req.Table); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{Success: true, Message: fmt.Sprintf("Tabel '%s' berhasil dihapus dari database!", req.Table)})
+}
+
+func HandleDatabaseRelations(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	dbName := strings.TrimSpace(r.URL.Query().Get("db"))
+	if dbName == "" {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Parameter db wajib diisi"})
+		return
+	}
+
+	rels, err := ListTableRelations(dbName)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{Success: true, Data: rels})
+}
+
+func HandleDatabaseAddRelation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	var req TableRelationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Format JSON tidak valid: " + err.Error()})
+		return
+	}
+
+	if err := AddTableRelation(req); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Message: fmt.Sprintf("Relasi foreign key '%s.%s' -> '%s.%s' berhasil dibuat!", req.TableName, req.ColumnName, req.ReferencedTableName, req.ReferencedColumnName),
+	})
+}
+
+func HandleDatabaseDropRelation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		Database       string `json:"database"`
+		Table          string `json:"table"`
+		ConstraintName string `json:"constraint_name"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Format JSON tidak valid: " + err.Error()})
+		return
+	}
+
+	if err := DropTableRelation(req.Database, req.Table, req.ConstraintName); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Message: fmt.Sprintf("Relasi '%s' berhasil dihapus!", req.ConstraintName),
+	})
+}
+
+

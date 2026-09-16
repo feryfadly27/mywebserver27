@@ -10,6 +10,7 @@ bin/
 data/
 logs/
 tmp/
+*.log
 
 # OS and IDE files
 .DS_Store

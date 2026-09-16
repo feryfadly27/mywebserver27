@@ -127,6 +127,20 @@ func main() {
 	mux.HandleFunc("/api/db/columns", HandleDatabaseColumns)
 	mux.HandleFunc("/api/db/seed", HandleDatabaseSeed)
 	mux.HandleFunc("/api/db/seed-template", HandleDatabaseSeedTemplate)
+	mux.HandleFunc("/api/db/create-quick", HandleDatabaseCreateQuick)
+	mux.HandleFunc("/api/db/table-data", HandleDatabaseTableData)
+	mux.HandleFunc("/api/db/insert-row", HandleDatabaseInsertRow)
+	mux.HandleFunc("/api/db/update-row", HandleDatabaseUpdateRow)
+	mux.HandleFunc("/api/db/delete-row", HandleDatabaseDeleteRow)
+	mux.HandleFunc("/api/db/alter-column", HandleDatabaseAlterColumn)
+	mux.HandleFunc("/api/db/drop-table", HandleDatabaseDropTable)
+	mux.HandleFunc("/api/db/relations", HandleDatabaseRelations)
+	mux.HandleFunc("/api/db/add-relation", HandleDatabaseAddRelation)
+	mux.HandleFunc("/api/db/drop-relation", HandleDatabaseDropRelation)
+
+	// PHP CRUD Page Generator
+	mux.HandleFunc("/api/php-generator/preview", HandlePHPGeneratorPreview)
+	mux.HandleFunc("/api/php-generator/generate", HandlePHPGeneratorGenerate)
 
 	// Static Web Frontend (Prefer disk if folder exists next to binary, fallback to embedded)
 	var staticFS http.FileSystem

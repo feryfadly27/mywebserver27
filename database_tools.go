@@ -988,3 +988,603 @@ CREATE TABLE IF NOT EXISTS `+"`orders`"+` (
 
 	return nil
 }
+
+// Quick Database Creator Structs & Engine
+type QuickColumnDef struct {
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	AllowNull  bool   `json:"allow_null"`
+	DefaultVal string `json:"default_val"`
+}
+
+type QuickTableDef struct {
+	Name    string           `json:"name"`
+	Columns []QuickColumnDef `json:"columns"`
+}
+
+type QuickDatabaseCreateRequest struct {
+	DatabaseName   string          `json:"database_name"`
+	Tables         []QuickTableDef `json:"tables"`
+	SeedSampleData bool            `json:"seed_sample_data"`
+	SeedCount      int             `json:"seed_count"`
+}
+
+// CreateQuickDatabase builds a database and user-defined tables, with optional smart sample data
+func CreateQuickDatabase(req QuickDatabaseCreateRequest) error {
+	req.DatabaseName = strings.TrimSpace(req.DatabaseName)
+	if req.DatabaseName == "" {
+		return fmt.Errorf("nama database tidak boleh kosong")
+	}
+
+	// Sanitize DB Name
+	cleanDb := strings.ToLower(req.DatabaseName)
+	cleanDb = strings.ReplaceAll(cleanDb, "-", "_")
+	cleanDb = strings.ReplaceAll(cleanDb, " ", "_")
+
+	if len(req.Tables) == 0 {
+		return fmt.Errorf("minimal sertakan 1 tabel untuk dibuat")
+	}
+
+	settings := GetCurrentSettings()
+	if !Manager.IsPortOpen(settings.MariaDBPort) {
+		if err := Manager.StartMariaDB(); err != nil {
+			return fmt.Errorf("MariaDB tidak aktif: %w", err)
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`;\nUSE `%s`;\n\n", cleanDb, cleanDb))
+
+	for _, tbl := range req.Tables {
+		tblName := strings.TrimSpace(tbl.Name)
+		if tblName == "" {
+			continue
+		}
+		cleanTbl := strings.ToLower(tblName)
+		cleanTbl = strings.ReplaceAll(cleanTbl, "-", "_")
+		cleanTbl = strings.ReplaceAll(cleanTbl, " ", "_")
+
+		sb.WriteString(fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` (\n", cleanTbl))
+
+		var colDefs []string
+		hasId := false
+
+		for _, col := range tbl.Columns {
+			cName := strings.TrimSpace(col.Name)
+			if cName == "" {
+				continue
+			}
+			cleanCol := strings.ToLower(cName)
+			cleanCol = strings.ReplaceAll(cleanCol, " ", "_")
+			cleanCol = strings.ReplaceAll(cleanCol, "-", "_")
+
+			cType := strings.TrimSpace(col.Type)
+			if cType == "" {
+				cType = "VARCHAR(100)"
+			}
+
+			if cleanCol == "id" {
+				hasId = true
+				colDefs = append(colDefs, "    `id` INT AUTO_INCREMENT PRIMARY KEY")
+				continue
+			}
+
+			nullStr := "NOT NULL"
+			if col.AllowNull {
+				nullStr = "NULL"
+			}
+
+			defStr := ""
+			if col.DefaultVal != "" {
+				defStr = fmt.Sprintf(" DEFAULT '%s'", strings.ReplaceAll(col.DefaultVal, "'", "''"))
+			} else if strings.EqualFold(cleanCol, "created_at") && strings.Contains(strings.ToLower(cType), "datetime") {
+				defStr = " DEFAULT CURRENT_TIMESTAMP"
+			}
+
+			colDefs = append(colDefs, fmt.Sprintf("    `%s` %s %s%s", cleanCol, cType, nullStr, defStr))
+		}
+
+		// If no primary key id was defined, automatically prepend standard auto-increment id
+		if !hasId {
+			colDefs = append([]string{"    `id` INT AUTO_INCREMENT PRIMARY KEY"}, colDefs...)
+		}
+
+		sb.WriteString(strings.Join(colDefs, ",\n"))
+		sb.WriteString("\n);\n\n")
+	}
+
+	// 1. Execute SQL Schema Creation
+	if err := RestoreDatabaseFromSQL(cleanDb, strings.NewReader(sb.String())); err != nil {
+		return fmt.Errorf("gagal membuat skema database: %w", err)
+	}
+
+	// 2. Auto-seed sample data if requested
+	if req.SeedSampleData {
+		count := req.SeedCount
+		if count <= 0 {
+			count = 10
+		}
+		for _, tbl := range req.Tables {
+			cleanTbl := strings.ToLower(strings.TrimSpace(tbl.Name))
+			cleanTbl = strings.ReplaceAll(cleanTbl, "-", "_")
+			cleanTbl = strings.ReplaceAll(cleanTbl, " ", "_")
+			if cleanTbl != "" {
+				_, _ = GenerateSmartSeedData(cleanDb, cleanTbl, count)
+			}
+		}
+	}
+
+	return nil
+}
+
+// ==========================================
+// Database Editor & Relations Engine
+// ==========================================
+
+type TableDataResult struct {
+	Columns    []TableColumnInfo `json:"columns"`
+	Rows       []map[string]any  `json:"rows"`
+	TotalRows  int               `json:"total_rows"`
+	Page       int               `json:"page"`
+	Limit      int               `json:"limit"`
+	TotalPages int               `json:"total_pages"`
+	PrimaryKey string            `json:"primary_key"`
+}
+
+type TableRelationInfo struct {
+	ConstraintName       string `json:"constraint_name"`
+	TableName            string `json:"table_name"`
+	ColumnName           string `json:"column_name"`
+	ReferencedTableName  string `json:"referenced_table_name"`
+	ReferencedColumnName string `json:"referenced_column_name"`
+	UpdateRule           string `json:"update_rule"`
+	DeleteRule           string `json:"delete_rule"`
+}
+
+type TableRelationRequest struct {
+	DatabaseName         string `json:"database_name"`
+	TableName            string `json:"table_name"`
+	ColumnName           string `json:"column_name"`
+	ReferencedTableName  string `json:"referenced_table_name"`
+	ReferencedColumnName string `json:"referenced_column_name"`
+	OnDelete             string `json:"on_delete"`
+	OnUpdate             string `json:"on_update"`
+}
+
+func execMariaDBRawQuery(dbName, query string) (string, error) {
+	settings := GetCurrentSettings()
+	clientBin := getMariaDBClientBin()
+	if clientBin == "" {
+		return "", fmt.Errorf("mariadb client binary tidak ditemukan")
+	}
+
+	if !Manager.IsPortOpen(settings.MariaDBPort) {
+		if err := Manager.StartMariaDB(); err != nil {
+			return "", fmt.Errorf("MariaDB tidak aktif: %w", err)
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	var args []string
+	args = append(args, "-u", "root", "-P", fmt.Sprintf("%d", settings.MariaDBPort), "-A", "--default-character-set=utf8mb4")
+	if dbName != "" {
+		args = append(args, dbName)
+	}
+	args = append(args, "-e", query)
+
+	cmd := exec.Command(clientBin, args...)
+	SetCmdHideWindow(cmd)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%s", strings.TrimSpace(string(out)))
+	}
+	return string(out), nil
+}
+
+// GetTableData retrieves paginated table rows with optional text search and column metadata
+func GetTableData(dbName, tableName, search string, page, limit int) (*TableDataResult, error) {
+	if dbName == "" || tableName == "" {
+		return nil, fmt.Errorf("nama database dan tabel tidak boleh kosong")
+	}
+
+	cols, err := DescribeTable(dbName, tableName)
+	if err != nil {
+		return nil, err
+	}
+
+	pkCol := "id"
+	foundPk := false
+	for _, c := range cols {
+		if c.Key == "PRI" {
+			pkCol = c.Field
+			foundPk = true
+			break
+		}
+	}
+	if !foundPk && len(cols) > 0 {
+		pkCol = cols[0].Field
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 500 {
+		limit = 25
+	}
+	offset := (page - 1) * limit
+
+	// Build WHERE clause if search query provided
+	whereClause := ""
+	search = strings.TrimSpace(search)
+	if search != "" {
+		safeSearch := strings.ReplaceAll(search, "\\", "\\\\")
+		safeSearch = strings.ReplaceAll(safeSearch, "'", "\\'")
+		var likes []string
+		for _, c := range cols {
+			likes = append(likes, fmt.Sprintf("CAST(`%s` AS CHAR) LIKE '%%%s%%'", c.Field, safeSearch))
+		}
+		if len(likes) > 0 {
+			whereClause = " WHERE " + strings.Join(likes, " OR ")
+		}
+	}
+
+	// 1. Total Rows Query
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM `%s`%s;", tableName, whereClause)
+	countOut, err := execMariaDBRawQuery(dbName, countQuery)
+	totalRows := 0
+	if err == nil {
+		lines := strings.Split(strings.TrimSpace(countOut), "\n")
+		if len(lines) >= 2 {
+			totalRows, _ = strconv.Atoi(strings.TrimSpace(lines[1]))
+		}
+	}
+
+	totalPages := 1
+	if totalRows > 0 {
+		totalPages = (totalRows + limit - 1) / limit
+	}
+
+	// 2. Fetch Page Rows
+	orderClause := ""
+	if pkCol != "" {
+		orderClause = fmt.Sprintf(" ORDER BY `%s` DESC", pkCol)
+	}
+	dataQuery := fmt.Sprintf("SELECT * FROM `%s`%s%s LIMIT %d OFFSET %d;", tableName, whereClause, orderClause, limit, offset)
+	dataOut, err := execMariaDBRawQuery(dbName, dataQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	var rows []map[string]any
+	lines := strings.Split(dataOut, "\n")
+	if len(lines) > 1 {
+		headers := strings.Split(strings.TrimRight(lines[0], "\r"), "\t")
+		for _, line := range lines[1:] {
+			line = strings.TrimRight(line, "\r")
+			if line == "" {
+				continue
+			}
+			parts := strings.Split(line, "\t")
+			rowMap := make(map[string]any)
+			for idx, h := range headers {
+				if idx < len(parts) {
+					val := parts[idx]
+					if val == "NULL" {
+						rowMap[h] = nil
+					} else {
+						rowMap[h] = val
+					}
+				} else {
+					rowMap[h] = nil
+				}
+			}
+			rows = append(rows, rowMap)
+		}
+	}
+
+	return &TableDataResult{
+		Columns:    cols,
+		Rows:       rows,
+		TotalRows:  totalRows,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+		PrimaryKey: pkCol,
+	}, nil
+}
+
+// InsertTableRow inserts a new row into the specified table
+func InsertTableRow(dbName, tableName string, rowData map[string]any) error {
+	if dbName == "" || tableName == "" {
+		return fmt.Errorf("database dan tabel tidak boleh kosong")
+	}
+
+	var colNames []string
+	var valPlaceholders []string
+
+	for k, v := range rowData {
+		cleanCol := strings.TrimSpace(k)
+		if cleanCol == "" {
+			continue
+		}
+		colNames = append(colNames, fmt.Sprintf("`%s`", cleanCol))
+
+		if v == nil {
+			valPlaceholders = append(valPlaceholders, "NULL")
+		} else {
+			strVal := fmt.Sprintf("%v", v)
+			safeVal := strings.ReplaceAll(strVal, "\\", "\\\\")
+			safeVal = strings.ReplaceAll(safeVal, "'", "\\'")
+			valPlaceholders = append(valPlaceholders, fmt.Sprintf("'%s'", safeVal))
+		}
+	}
+
+	if len(colNames) == 0 {
+		return fmt.Errorf("tidak ada data kolom untuk disimpan")
+	}
+
+	query := fmt.Sprintf("INSERT INTO `%s` (%s) VALUES (%s);",
+		tableName,
+		strings.Join(colNames, ", "),
+		strings.Join(valPlaceholders, ", "))
+
+	_, err := execMariaDBRawQuery(dbName, query)
+	return err
+}
+
+// UpdateTableRow updates an existing row identified by its Primary Key
+func UpdateTableRow(dbName, tableName, pkCol string, pkVal any, rowData map[string]any) error {
+	if dbName == "" || tableName == "" || pkCol == "" {
+		return fmt.Errorf("database, tabel, dan primary key tidak boleh kosong")
+	}
+
+	var setClauses []string
+	for k, v := range rowData {
+		cleanCol := strings.TrimSpace(k)
+		if cleanCol == "" || cleanCol == pkCol {
+			continue // Do not update primary key
+		}
+
+		if v == nil {
+			setClauses = append(setClauses, fmt.Sprintf("`%s` = NULL", cleanCol))
+		} else {
+			strVal := fmt.Sprintf("%v", v)
+			safeVal := strings.ReplaceAll(strVal, "\\", "\\\\")
+			safeVal = strings.ReplaceAll(safeVal, "'", "\\'")
+			setClauses = append(setClauses, fmt.Sprintf("`%s` = '%s'", cleanCol, safeVal))
+		}
+	}
+
+	if len(setClauses) == 0 {
+		return fmt.Errorf("tidak ada perubahan data")
+	}
+
+	safePkVal := fmt.Sprintf("%v", pkVal)
+	safePkVal = strings.ReplaceAll(safePkVal, "'", "\\'")
+
+	query := fmt.Sprintf("UPDATE `%s` SET %s WHERE `%s` = '%s' LIMIT 1;",
+		tableName,
+		strings.Join(setClauses, ", "),
+		pkCol,
+		safePkVal)
+
+	_, err := execMariaDBRawQuery(dbName, query)
+	return err
+}
+
+// DeleteTableRow removes a row identified by primary key
+func DeleteTableRow(dbName, tableName, pkCol string, pkVal any) error {
+	if dbName == "" || tableName == "" || pkCol == "" {
+		return fmt.Errorf("database, tabel, dan primary key tidak boleh kosong")
+	}
+
+	safePkVal := fmt.Sprintf("%v", pkVal)
+	safePkVal = strings.ReplaceAll(safePkVal, "'", "\\'")
+
+	query := fmt.Sprintf("DELETE FROM `%s` WHERE `%s` = '%s' LIMIT 1;", tableName, pkCol, safePkVal)
+	_, err := execMariaDBRawQuery(dbName, query)
+	return err
+}
+
+// AddTableColumn adds a new column to an existing table
+func AddTableColumn(dbName, tableName string, col QuickColumnDef, afterCol string, isFirst bool) error {
+	colName := strings.ToLower(strings.TrimSpace(col.Name))
+	colName = strings.ReplaceAll(colName, " ", "_")
+	colName = strings.ReplaceAll(colName, "-", "_")
+	if colName == "" {
+		return fmt.Errorf("nama kolom tidak boleh kosong")
+	}
+
+	colType := strings.TrimSpace(col.Type)
+	if colType == "" {
+		colType = "VARCHAR(100)"
+	}
+
+	nullStr := "NOT NULL"
+	if col.AllowNull {
+		nullStr = "NULL"
+	}
+
+	defStr := ""
+	if col.DefaultVal != "" {
+		defStr = fmt.Sprintf(" DEFAULT '%s'", strings.ReplaceAll(col.DefaultVal, "'", "\\'"))
+	}
+
+	posStr := ""
+	if isFirst {
+		posStr = " FIRST"
+	} else if strings.TrimSpace(afterCol) != "" {
+		posStr = fmt.Sprintf(" AFTER `%s`", strings.TrimSpace(afterCol))
+	}
+
+	query := fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN `%s` %s %s%s%s;",
+		tableName, colName, colType, nullStr, defStr, posStr)
+
+	_, err := execMariaDBRawQuery(dbName, query)
+	return err
+}
+
+// ModifyTableColumn alters an existing column definition
+func ModifyTableColumn(dbName, tableName, oldColName string, col QuickColumnDef) error {
+	oldColName = strings.TrimSpace(oldColName)
+	newColName := strings.ToLower(strings.TrimSpace(col.Name))
+	newColName = strings.ReplaceAll(newColName, " ", "_")
+	newColName = strings.ReplaceAll(newColName, "-", "_")
+	if oldColName == "" || newColName == "" {
+		return fmt.Errorf("nama kolom tidak boleh kosong")
+	}
+
+	colType := strings.TrimSpace(col.Type)
+	if colType == "" {
+		colType = "VARCHAR(100)"
+	}
+
+	nullStr := "NOT NULL"
+	if col.AllowNull {
+		nullStr = "NULL"
+	}
+
+	defStr := ""
+	if col.DefaultVal != "" {
+		defStr = fmt.Sprintf(" DEFAULT '%s'", strings.ReplaceAll(col.DefaultVal, "'", "\\'"))
+	}
+
+	query := fmt.Sprintf("ALTER TABLE `%s` CHANGE COLUMN `%s` `%s` %s %s%s;",
+		tableName, oldColName, newColName, colType, nullStr, defStr)
+
+	_, err := execMariaDBRawQuery(dbName, query)
+	return err
+}
+
+// DropTableColumn drops a column from a table
+func DropTableColumn(dbName, tableName, colName string) error {
+	colName = strings.TrimSpace(colName)
+	if colName == "" {
+		return fmt.Errorf("nama kolom tidak boleh kosong")
+	}
+
+	query := fmt.Sprintf("ALTER TABLE `%s` DROP COLUMN `%s`;", tableName, colName)
+	_, err := execMariaDBRawQuery(dbName, query)
+	return err
+}
+
+// DropTable drops a table from the database
+func DropTable(dbName, tableName string) error {
+	tableName = strings.TrimSpace(tableName)
+	if tableName == "" {
+		return fmt.Errorf("nama tabel tidak boleh kosong")
+	}
+
+	query := fmt.Sprintf("DROP TABLE IF EXISTS `%s`;", tableName)
+	_, err := execMariaDBRawQuery(dbName, query)
+	return err
+}
+
+// ListTableRelations retrieves all foreign key constraints in a database
+func ListTableRelations(dbName string) ([]TableRelationInfo, error) {
+	if dbName == "" {
+		return nil, fmt.Errorf("nama database tidak boleh kosong")
+	}
+
+	query := fmt.Sprintf(`
+		SELECT 
+			k.CONSTRAINT_NAME,
+			k.TABLE_NAME,
+			k.COLUMN_NAME,
+			k.REFERENCED_TABLE_NAME,
+			k.REFERENCED_COLUMN_NAME,
+			COALESCE(r.UPDATE_RULE, 'RESTRICT'),
+			COALESCE(r.DELETE_RULE, 'RESTRICT')
+		FROM information_schema.KEY_COLUMN_USAGE k
+		LEFT JOIN information_schema.REFERENTIAL_CONSTRAINTS r 
+			ON k.CONSTRAINT_NAME = r.CONSTRAINT_NAME 
+			AND k.CONSTRAINT_SCHEMA = r.CONSTRAINT_SCHEMA
+		WHERE k.CONSTRAINT_SCHEMA = '%s' 
+			AND k.REFERENCED_TABLE_NAME IS NOT NULL;
+	`, strings.ReplaceAll(dbName, "'", "\\'"))
+
+	out, err := execMariaDBRawQuery(dbName, query)
+	if err != nil {
+		return nil, err
+	}
+
+	var list []TableRelationInfo
+	lines := strings.Split(out, "\n")
+	for i, line := range lines {
+		line = strings.TrimRight(line, "\r")
+		if line == "" || i == 0 { // skip header
+			continue
+		}
+		parts := strings.Split(line, "\t")
+		if len(parts) >= 5 {
+			rel := TableRelationInfo{
+				ConstraintName:       parts[0],
+				TableName:            parts[1],
+				ColumnName:           parts[2],
+				ReferencedTableName:  parts[3],
+				ReferencedColumnName: parts[4],
+				UpdateRule:           "RESTRICT",
+				DeleteRule:           "RESTRICT",
+			}
+			if len(parts) > 5 && parts[5] != "NULL" {
+				rel.UpdateRule = parts[5]
+			}
+			if len(parts) > 6 && parts[6] != "NULL" {
+				rel.DeleteRule = parts[6]
+			}
+			list = append(list, rel)
+		}
+	}
+
+	return list, nil
+}
+
+// AddTableRelation creates a foreign key relationship between two tables
+func AddTableRelation(req TableRelationRequest) error {
+	dbName := strings.TrimSpace(req.DatabaseName)
+	srcTable := strings.TrimSpace(req.TableName)
+	srcCol := strings.TrimSpace(req.ColumnName)
+	refTable := strings.TrimSpace(req.ReferencedTableName)
+	refCol := strings.TrimSpace(req.ReferencedColumnName)
+
+	if dbName == "" || srcTable == "" || srcCol == "" || refTable == "" || refCol == "" {
+		return fmt.Errorf("seluruh field tabel dan kolom relasi wajib diisi")
+	}
+
+	onDelete := strings.ToUpper(strings.TrimSpace(req.OnDelete))
+	if onDelete == "" {
+		onDelete = "CASCADE"
+	}
+	onUpdate := strings.ToUpper(strings.TrimSpace(req.OnUpdate))
+	if onUpdate == "" {
+		onUpdate = "CASCADE"
+	}
+
+	constraintName := fmt.Sprintf("fk_%s_%s_%s", srcTable, srcCol, refTable)
+	if len(constraintName) > 60 {
+		constraintName = constraintName[:60]
+	}
+
+	query := fmt.Sprintf("ALTER TABLE `%s` ADD CONSTRAINT `%s` FOREIGN KEY (`%s`) REFERENCES `%s`(`%s`) ON DELETE %s ON UPDATE %s;",
+		srcTable, constraintName, srcCol, refTable, refCol, onDelete, onUpdate)
+
+	_, err := execMariaDBRawQuery(dbName, query)
+	return err
+}
+
+// DropTableRelation removes a foreign key relationship
+func DropTableRelation(dbName, tableName, constraintName string) error {
+	dbName = strings.TrimSpace(dbName)
+	tableName = strings.TrimSpace(tableName)
+	constraintName = strings.TrimSpace(constraintName)
+
+	if dbName == "" || tableName == "" || constraintName == "" {
+		return fmt.Errorf("database, tabel, dan nama relasi (constraint) tidak boleh kosong")
+	}
+
+	query := fmt.Sprintf("ALTER TABLE `%s` DROP FOREIGN KEY `%s`;", tableName, constraintName)
+	_, err := execMariaDBRawQuery(dbName, query)
+	return err
+}
+

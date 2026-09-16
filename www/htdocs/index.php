@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -156,6 +157,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="card">
         <div class="header">
@@ -164,12 +166,13 @@
                 <span>Server Aktif &bull; PHP <?php echo phpversion(); ?></span>
             </div>
             <h1>MyLokalWebserver Siap Digunakan</h1>
-            <p>File ini berada di direktori <code>www/htdocs/index.php</code>. Ganti atau tambahkan file proyek web Anda di folder tersebut.</p>
+            <p>File ini berada di direktori <code>www/htdocs/index.php</code>. Ganti atau tambahkan file proyek web Anda
+                di folder tersebut.</p>
         </div>
 
         <div class="links">
             <a href="/phpmyadmin" class="btn btn-primary">Buka phpMyAdmin</a>
-            <a href="http://localhost:3000" class="btn btn-default" target="_blank">Control Panel</a>
+            <a href="http://localhost:3001" class="btn btn-default" target="_blank">Control Panel</a>
         </div>
 
         <div class="info-table">
@@ -187,9 +190,12 @@
             </div>
         </div>
 
-        <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); text-align: center; font-size: 12px; color: var(--text-muted);">
-            Created by <strong style="color: var(--text); font-weight: 600;">Fery Fadly</strong> and <strong style="color: var(--text); font-weight: 600;">Team Dikodein</strong>
+        <div
+            style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); text-align: center; font-size: 12px; color: var(--text-muted);">
+            Created by <strong style="color: var(--text); font-weight: 600;">Fery Fadly</strong> and <strong
+                style="color: var(--text); font-weight: 600;">Team Dikodein</strong>
         </div>
     </div>
 </body>
+
 </html>

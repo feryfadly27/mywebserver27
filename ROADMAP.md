@@ -28,9 +28,9 @@ Dokumen ini berisi daftar fitur yang telah selesai dibangun serta daftar ide fit
 
 ### 1. 🗄️ Database & Quick Data Tools
 - [x] **One-Click Database Backup & Restore (.sql)** (Sudah selesai di v1.2.0)
-- [ ] **Quick Database Creator**
+- [x ] **Quick Database Creator**
   - Modal formulir ringkas untuk membuat database baru dan user MySQL langsung dalam 1 klik.
-- [ ] **Database Seed Helper**
+- [x ] **Database Seed Helper**
   - Generator data dummy otomatis untuk pengujian aplikasi lokal.
 
 ---
