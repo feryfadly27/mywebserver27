@@ -117,12 +117,16 @@ func main() {
 	// Network LAN IP & QR Sharing
 	mux.HandleFunc("/api/network/ips", HandleNetworkIPs)
 
-	// Database Backup & Restore Tools
+	// Database Backup & Restore & Seeder Tools
 	mux.HandleFunc("/api/db/list", HandleDatabaseList)
 	mux.HandleFunc("/api/db/backup", HandleDatabaseBackup)
 	mux.HandleFunc("/api/db/restore", HandleDatabaseRestore)
 	mux.HandleFunc("/api/db/download", HandleDatabaseBackupDownload)
 	mux.HandleFunc("/api/db/delete-backup", HandleDatabaseDeleteBackup)
+	mux.HandleFunc("/api/db/tables", HandleDatabaseTables)
+	mux.HandleFunc("/api/db/columns", HandleDatabaseColumns)
+	mux.HandleFunc("/api/db/seed", HandleDatabaseSeed)
+	mux.HandleFunc("/api/db/seed-template", HandleDatabaseSeedTemplate)
 
 	// Static Web Frontend (Prefer disk if folder exists next to binary, fallback to embedded)
 	var staticFS http.FileSystem

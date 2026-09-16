@@ -1063,5 +1063,128 @@ func HandleHostsSync(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Database Seeder API Handlers
+func HandleDatabaseTables(w http.ResponseWriter, r *http.Request) {
+	dbName := strings.TrimSpace(r.URL.Query().Get("db"))
+	if dbName == "" {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Nama database harus ditentukan"})
+		return
+	}
+	tables, err := ListTables(dbName)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data: map[string]any{
+			"database": dbName,
+			"tables":   tables,
+		},
+	})
+}
 
+func HandleDatabaseColumns(w http.ResponseWriter, r *http.Request) {
+	dbName := strings.TrimSpace(r.URL.Query().Get("db"))
+	tableName := strings.TrimSpace(r.URL.Query().Get("table"))
+	if dbName == "" || tableName == "" {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Nama database dan tabel harus ditentukan"})
+		return
+	}
+	cols, err := DescribeTable(dbName, tableName)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data: map[string]any{
+			"database": dbName,
+			"table":    tableName,
+			"columns":  cols,
+		},
+	})
+}
 
+type DatabaseSeedRequest struct {
+	Database string `json:"database"`
+	Table    string `json:"table"`
+	Count    int    `json:"count"`
+}
+
+func HandleDatabaseSeed(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	var req DatabaseSeedRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Invalid JSON body"})
+		return
+	}
+
+	req.Database = strings.TrimSpace(req.Database)
+	req.Table = strings.TrimSpace(req.Table)
+	if req.Database == "" || req.Table == "" {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Pilih database dan tabel target"})
+		return
+	}
+	if req.Count <= 0 {
+		req.Count = 10
+	}
+	if req.Count > 500 {
+		req.Count = 500
+	}
+
+	inserted, err := GenerateSmartSeedData(req.Database, req.Table, req.Count)
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Message: fmt.Sprintf("Berhasil menambahkan %d baris data contoh realistis ke tabel '%s'!", inserted, req.Table),
+		Data: map[string]any{
+			"database": req.Database,
+			"table":    req.Table,
+			"count":    inserted,
+		},
+	})
+}
+
+type DatabaseSeedTemplateRequest struct {
+	Database string `json:"database"`
+	Template string `json:"template"`
+}
+
+func HandleDatabaseSeedTemplate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Error: "Method not allowed"})
+		return
+	}
+
+	var req DatabaseSeedTemplateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Invalid JSON body"})
+		return
+	}
+
+	req.Database = strings.TrimSpace(req.Database)
+	req.Template = strings.TrimSpace(req.Template)
+	if req.Database == "" || req.Template == "" {
+		jsonResponse(w, http.StatusBadRequest, APIResponse{Success: false, Error: "Nama database dan template harus dipilih"})
+		return
+	}
+
+	if err := ApplyPresetDatabaseTemplate(req.Database, req.Template); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, APIResponse{
+		Success: true,
+		Message: fmt.Sprintf("Template database '%s' berhasil dibuat dan diisi data contoh pada database '%s'!", req.Template, req.Database),
+	})
+}

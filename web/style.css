@@ -1657,6 +1657,126 @@ body {
     font-size: 11.5px;
 }
 
+/* Data Seeder Styles */
+.seeder-mode-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    background-color: var(--bg-subtle);
+    padding: 4px;
+    border-radius: var(--radius-md);
+    margin-bottom: 14px;
+    border: 1px solid var(--border-color);
+}
+
+.seeder-mode-option {
+    padding: 8px 12px;
+    text-align: center;
+    border-radius: var(--radius-sm);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.seeder-mode-option.active {
+    background-color: var(--bg-surface);
+    color: var(--primary);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.seed-columns-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    max-height: 190px;
+    overflow-y: auto;
+    background-color: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 8px;
+}
+
+.seed-col-item {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.seed-col-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.seed-col-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.seed-col-type {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.seed-col-generator {
+    font-size: 11px;
+}
+
+.preset-templates-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.preset-card {
+    background-color: var(--bg-surface);
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.preset-card:hover {
+    border-color: #38bdf8;
+    background-color: #f8fafc;
+}
+
+.preset-card.active {
+    border-color: var(--primary);
+    background-color: #f0f9ff;
+    box-shadow: 0 0 0 1px var(--primary);
+}
+
+.preset-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-main);
+}
+
+.preset-icon {
+    font-size: 18px;
+}
+
+.preset-desc {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
 .hidden {
     display: none !important;
 }

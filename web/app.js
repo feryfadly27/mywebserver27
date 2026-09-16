@@ -1335,6 +1335,59 @@ function initDatabaseTools() {
     if (btnRestore) {
         btnRestore.addEventListener('click', doUploadSqlRestore);
     }
+
+    // Seeder Listeners
+    const selectSeedDb = document.getElementById('selectSeedDb');
+    if (selectSeedDb) {
+        selectSeedDb.addEventListener('change', onSeedDbChange);
+    }
+
+    const selectSeedTable = document.getElementById('selectSeedTable');
+    if (selectSeedTable) {
+        selectSeedTable.addEventListener('change', onSeedTableChange);
+    }
+
+    const btnSeedData = document.getElementById('btnDoSeedData');
+    if (btnSeedData) {
+        btnSeedData.addEventListener('click', doExecuteSeeder);
+    }
+
+    const btnApplyTemplate = document.getElementById('btnApplyTemplate');
+    if (btnApplyTemplate) {
+        btnApplyTemplate.addEventListener('click', doApplyPresetTemplate);
+    }
+
+    // Mode Toggle (Custom table vs Preset template)
+    const modeCustom = document.getElementById('modeLabelCustomTable');
+    const modePreset = document.getElementById('modeLabelPresetTemplate');
+    const panelCustom = document.getElementById('seederPanelCustomTable');
+    const panelPreset = document.getElementById('seederPanelPresetTemplate');
+
+    if (modeCustom && modePreset) {
+        modeCustom.addEventListener('click', () => {
+            modeCustom.classList.add('active');
+            modePreset.classList.remove('active');
+            panelCustom.classList.remove('hidden');
+            panelPreset.classList.add('hidden');
+        });
+
+        modePreset.addEventListener('click', () => {
+            modePreset.classList.add('active');
+            modeCustom.classList.remove('active');
+            panelPreset.classList.remove('hidden');
+            panelCustom.classList.add('hidden');
+        });
+    }
+
+    // Preset cards selection highlight
+    document.querySelectorAll('.preset-card').forEach(card => {
+        card.addEventListener('click', () => {
+            document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+            const radio = card.querySelector('input[type="radio"]');
+            if (radio) radio.checked = true;
+        });
+    });
 }
 
 function handleSelectedSqlFile(file) {
@@ -1360,6 +1413,7 @@ async function openDatabaseModal() {
 async function fetchDatabaseData() {
     const selectBackup = document.getElementById('selectBackupDb');
     const selectRestore = document.getElementById('selectRestoreTargetDb');
+    const selectSeed = document.getElementById('selectSeedDb');
     const tableBody = document.getElementById('backupHistoryTableBody');
 
     try {
@@ -1406,6 +1460,21 @@ async function fetchDatabaseData() {
             });
         }
 
+        if (selectSeed) {
+            selectSeed.innerHTML = '';
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.textContent = '-- Pilih database --';
+            selectSeed.appendChild(defaultOpt);
+
+            currentDbList.forEach(db => {
+                const opt = document.createElement('option');
+                opt.value = db;
+                opt.textContent = `📁 ${db}`;
+                selectSeed.appendChild(opt);
+            });
+        }
+
         // Render History Table
         if (tableBody) {
             if (currentBackups.length === 0) {
@@ -1429,6 +1498,250 @@ async function fetchDatabaseData() {
 
     } catch (e) {
         console.error('Error fetching database list:', e);
+    }
+}
+
+// Seeder Handlers
+async function onSeedDbChange() {
+    const selectDb = document.getElementById('selectSeedDb');
+    const selectTbl = document.getElementById('selectSeedTable');
+    const previewBox = document.getElementById('seedColumnPreviewContainer');
+    const btnSeed = document.getElementById('btnDoSeedData');
+    const alertEl = document.getElementById('seedAlertResult');
+    if (alertEl) alertEl.classList.add('hidden');
+
+    const dbName = selectDb ? selectDb.value : '';
+    if (!dbName) {
+        selectTbl.innerHTML = '<option value="">-- Pilih Database Dahulu --</option>';
+        selectTbl.disabled = true;
+        previewBox.classList.add('hidden');
+        btnSeed.disabled = true;
+        return;
+    }
+
+    selectTbl.innerHTML = '<option value="">Memuat daftar tabel...</option>';
+    selectTbl.disabled = true;
+    previewBox.classList.add('hidden');
+    btnSeed.disabled = true;
+
+    try {
+        const res = await fetch(`/api/db/tables?db=${encodeURIComponent(dbName)}`);
+        const data = await res.json();
+
+        if (data.success && data.data && data.data.tables) {
+            const tables = data.data.tables;
+            selectTbl.innerHTML = '';
+
+            if (tables.length === 0) {
+                selectTbl.innerHTML = '<option value="">(Tidak ada tabel dalam database ini)</option>';
+                selectTbl.disabled = true;
+                return;
+            }
+
+            const defOpt = document.createElement('option');
+            defOpt.value = '';
+            defOpt.textContent = '-- Pilih Tabel Target --';
+            selectTbl.appendChild(defOpt);
+
+            tables.forEach(tbl => {
+                const opt = document.createElement('option');
+                opt.value = tbl;
+                opt.textContent = `📋 ${tbl}`;
+                selectTbl.appendChild(opt);
+            });
+
+            selectTbl.disabled = false;
+        } else {
+            selectTbl.innerHTML = `<option value="">Gagal: ${data.error || 'Error'}</option>`;
+        }
+    } catch (e) {
+        selectTbl.innerHTML = `<option value="">Error: ${e.message}</option>`;
+    }
+}
+
+async function onSeedTableChange() {
+    const selectDb = document.getElementById('selectSeedDb');
+    const selectTbl = document.getElementById('selectSeedTable');
+    const previewBox = document.getElementById('seedColumnPreviewContainer');
+    const grid = document.getElementById('seedColumnsGrid');
+    const badgeCount = document.getElementById('textColCountBadge');
+    const btnSeed = document.getElementById('btnDoSeedData');
+    const alertEl = document.getElementById('seedAlertResult');
+    if (alertEl) alertEl.classList.add('hidden');
+
+    const dbName = selectDb ? selectDb.value : '';
+    const tableName = selectTbl ? selectTbl.value : '';
+
+    if (!dbName || !tableName) {
+        previewBox.classList.add('hidden');
+        btnSeed.disabled = true;
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/db/columns?db=${encodeURIComponent(dbName)}&table=${encodeURIComponent(tableName)}`);
+        const data = await res.json();
+
+        if (data.success && data.data && data.data.columns) {
+            const cols = data.data.columns;
+            if (badgeCount) badgeCount.textContent = `${cols.length} Kolom Terdeteksi`;
+
+            grid.innerHTML = cols.map(c => {
+                let badgeClass = 'tag tag-done';
+                let icon = '✨';
+                if (c.detected_type === 'auto_increment') {
+                    badgeClass = 'tag tag-neutral';
+                    icon = '🔑';
+                } else if (c.detected_type === 'nama_lengkap') {
+                    badgeClass = 'tag tag-active';
+                    icon = '👤';
+                } else if (c.detected_type === 'nik') {
+                    badgeClass = 'tag tag-active';
+                    icon = '💳';
+                } else if (c.detected_type === 'phone') {
+                    badgeClass = 'tag tag-active';
+                    icon = '📱';
+                } else if (c.detected_type === 'alamat') {
+                    badgeClass = 'tag tag-active';
+                    icon = '🏠';
+                } else if (c.detected_type === 'keluhan_medis') {
+                    badgeClass = 'tag tag-active';
+                    icon = '🩺';
+                } else if (c.detected_type === 'nama_produk') {
+                    badgeClass = 'tag tag-active';
+                    icon = '📦';
+                } else if (c.detected_type === 'harga_rupiah') {
+                    badgeClass = 'tag tag-active';
+                    icon = '💰';
+                }
+
+                return `
+                    <div class="seed-col-item">
+                        <div class="seed-col-header">
+                            <span class="seed-col-name font-mono">${escapeHTML(c.field)}</span>
+                            <span class="seed-col-type font-mono">${escapeHTML(c.type)}</span>
+                        </div>
+                        <div class="seed-col-generator">
+                            <span class="${badgeClass}">${icon} ${escapeHTML(c.detected_label)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            previewBox.classList.remove('hidden');
+            btnSeed.disabled = false;
+        } else {
+            alert('Gagal membaca struktur kolom: ' + (data.error || 'Unknown error'));
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function doExecuteSeeder() {
+    const selectDb = document.getElementById('selectSeedDb');
+    const selectTbl = document.getElementById('selectSeedTable');
+    const selectCount = document.getElementById('selectSeedCount');
+    const btnSeed = document.getElementById('btnDoSeedData');
+    const textBtn = document.getElementById('textBtnSeedData');
+    const alertEl = document.getElementById('seedAlertResult');
+
+    const dbName = selectDb ? selectDb.value : '';
+    const tableName = selectTbl ? selectTbl.value : '';
+    const count = selectCount ? parseInt(selectCount.value, 10) : 10;
+
+    if (!dbName || !tableName) {
+        alert('Harap pilih database dan tabel target terlebih dahulu.');
+        return;
+    }
+
+    btnSeed.disabled = true;
+    if (textBtn) textBtn.textContent = 'Menyisipkan data contoh...';
+    alertEl.classList.add('hidden');
+
+    try {
+        const res = await fetch('/api/db/seed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                database: dbName,
+                table: tableName,
+                count: count
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            alertEl.className = 'modal-alert alert-success';
+            alertEl.textContent = `✓ ${data.message || 'Data contoh berhasil ditambahkan!'}`;
+            alertEl.classList.remove('hidden');
+        } else {
+            alertEl.className = 'modal-alert alert-error';
+            alertEl.textContent = `❌ ${data.error || 'Gagal menambahkan data contoh'}`;
+            alertEl.classList.remove('hidden');
+        }
+    } catch (e) {
+        alertEl.className = 'modal-alert alert-error';
+        alertEl.textContent = `❌ Error: ${e.message}`;
+        alertEl.classList.remove('hidden');
+    } finally {
+        btnSeed.disabled = false;
+        if (textBtn) textBtn.textContent = '🌱 Isi Data Sekarang';
+    }
+}
+
+async function doApplyPresetTemplate() {
+    const inputDb = document.getElementById('inputSeedTemplateDb');
+    const radioSelected = document.querySelector('input[name="presetTemplateKey"]:checked');
+    const btn = document.getElementById('btnApplyTemplate');
+    const textBtn = document.getElementById('textBtnApplyTemplate');
+    const alertEl = document.getElementById('seedAlertResult');
+
+    const dbName = inputDb ? inputDb.value.trim() : '';
+    const templateKey = radioSelected ? radioSelected.value : '';
+
+    if (!dbName) {
+        alert('Harap masukkan nama database target (misal: db_klinik atau db_kasir).');
+        if (inputDb) inputDb.focus();
+        return;
+    }
+    if (!templateKey) {
+        alert('Harap pilih salah satu template database.');
+        return;
+    }
+
+    btn.disabled = true;
+    if (textBtn) textBtn.textContent = 'Membuat skema tabel & data contoh...';
+    alertEl.classList.add('hidden');
+
+    try {
+        const res = await fetch('/api/db/seed-template', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                database: dbName,
+                template: templateKey
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            alertEl.className = 'modal-alert alert-success';
+            alertEl.textContent = `✓ ${data.message || 'Template database berhasil diterapkan!'}`;
+            alertEl.classList.remove('hidden');
+            await fetchDatabaseData();
+        } else {
+            alertEl.className = 'modal-alert alert-error';
+            alertEl.textContent = `❌ ${data.error || 'Gagal menerapkan template'}`;
+            alertEl.classList.remove('hidden');
+        }
+    } catch (e) {
+        alertEl.className = 'modal-alert alert-error';
+        alertEl.textContent = `❌ Error: ${e.message}`;
+        alertEl.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        if (textBtn) textBtn.textContent = '🚀 Buat Skema & Terapkan Template (1-Klik)';
     }
 }
 

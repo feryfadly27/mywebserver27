@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MyLokalWebserver</title>
-    <link rel="stylesheet" href="/style.css?v=1.1.2">
+    <link rel="stylesheet" href="/style.css?v=1.2.0">
     <!-- xterm.js CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
@@ -742,6 +742,7 @@
                     <button type="button" class="db-tab-btn active" data-tab="tabDbBackup">📦 Cadangkan (Backup)</button>
                     <button type="button" class="db-tab-btn" data-tab="tabDbRestore">🔄 Pulihkan (Restore / Impor)</button>
                     <button type="button" class="db-tab-btn" data-tab="tabDbHistory">📋 Riwayat File Backup</button>
+                    <button type="button" class="db-tab-btn" data-tab="tabDbSeeder">🌱 Data Seeder</button>
                 </div>
 
                 <!-- Tab 1: Backup -->
@@ -816,6 +817,126 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+
+                <!-- Tab 4: Smart Data Seeder -->
+                <div id="tabDbSeeder" class="db-tab-pane hidden">
+                    <div class="seeder-mode-toggle">
+                        <label class="seeder-mode-option active" id="modeLabelCustomTable">
+                            <input type="radio" name="seederMode" value="custom_table" checked style="display: none;">
+                            <span>🎯 Isi Data Tabel Nyata (Smart Auto-Detect)</span>
+                        </label>
+                        <label class="seeder-mode-option" id="modeLabelPresetTemplate">
+                            <input type="radio" name="seederMode" value="preset_template" style="display: none;">
+                            <span>📦 Template Database Siap Pakai</span>
+                        </label>
+                    </div>
+
+                    <!-- Panel 1: Smart Dynamic Table Seeder -->
+                    <div id="seederPanelCustomTable" class="seeder-panel">
+                        <div class="form-row">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <label for="selectSeedDb">1. Pilih Database:</label>
+                                    <select id="selectSeedDb" class="form-input" style="width: 100%;"></select>
+                                </div>
+                                <div>
+                                    <label for="selectSeedTable">2. Pilih Tabel Target:</label>
+                                    <select id="selectSeedTable" class="form-input" style="width: 100%;" disabled>
+                                        <option value="">-- Pilih Database Dahulu --</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Column Detection Preview Box -->
+                        <div id="seedColumnPreviewContainer" class="form-row hidden" style="margin-top: 10px;">
+                            <label style="display: flex; justify-content: space-between; align-items: center;">
+                                <span>3. Deteksi Kolom & Data Otomatis:</span>
+                                <span class="badge-fw badge-native" id="textColCountBadge" style="font-size: 11px;">0 Kolom</span>
+                            </label>
+                            <div class="seed-columns-grid" id="seedColumnsGrid">
+                                <!-- Populated dynamically by app.js -->
+                            </div>
+                        </div>
+
+                        <div class="form-row" style="margin-top: 12px;">
+                            <label for="selectSeedCount">4. Jumlah Baris Data yang Di-generate:</label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <select id="selectSeedCount" class="form-input" style="flex: 1;">
+                                    <option value="5">5 Baris Data</option>
+                                    <option value="10" selected>10 Baris Data (Standar)</option>
+                                    <option value="25">25 Baris Data</option>
+                                    <option value="50">50 Baris Data</option>
+                                    <option value="100">100 Baris Data (Stress Test)</option>
+                                </select>
+                                <button type="button" id="btnDoSeedData" class="btn btn-primary" disabled style="min-width: 170px; justify-content: center;">
+                                    <span id="textBtnSeedData">🌱 Isi Data Sekarang</span>
+                                </button>
+                            </div>
+                            <span class="form-hint" style="margin-top: 4px;">Data menggunakan nama, NIK, alamat, no HP, dan keluhan/deskripsi lokal Indonesia yang realistis.</span>
+                        </div>
+                    </div>
+
+                    <!-- Panel 2: Preset Database Templates -->
+                    <div id="seederPanelPresetTemplate" class="seeder-panel hidden">
+                        <div class="form-row">
+                            <label for="inputSeedTemplateDb">Nama Database Target:</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="inputSeedTemplateDb" class="form-input font-mono" placeholder="contoh: db_klinik / db_kasir" style="flex: 1;">
+                            </div>
+                            <span class="form-hint">Jika database belum ada, sistem akan otomatis membuatnya di MariaDB.</span>
+                        </div>
+
+                        <div class="form-row" style="margin-top: 12px;">
+                            <label>Pilih Template Database:</label>
+                            <div class="preset-templates-grid">
+                                <label class="preset-card active">
+                                    <input type="radio" name="presetTemplateKey" value="klinik_pasien" checked style="display: none;">
+                                    <div class="preset-card-head">
+                                        <span class="preset-icon">🏥</span>
+                                        <strong>Klinik & Pasien Medis</strong>
+                                    </div>
+                                    <span class="preset-desc">Tabel <code>pasien</code> (NIK, nama, diagnosa/keluhan), <code>dokter</code>, dan <code>kunjungan_berobat</code>.</span>
+                                </label>
+
+                                <label class="preset-card">
+                                    <input type="radio" name="presetTemplateKey" value="kasir_pos" style="display: none;">
+                                    <div class="preset-card-head">
+                                        <span class="preset-icon">🛒</span>
+                                        <strong>Kasir & Minimarket (POS)</strong>
+                                    </div>
+                                    <span class="preset-desc">Tabel <code>kategori</code>, <code>produk</code> (harga, stok), dan <code>transaksi</code> penjualan.</span>
+                                </label>
+
+                                <label class="preset-card">
+                                    <input type="radio" name="presetTemplateKey" value="manajemen_users" style="display: none;">
+                                    <div class="preset-card-head">
+                                        <span class="preset-icon">👥</span>
+                                        <strong>Akun & Karyawan (HR)</strong>
+                                    </div>
+                                    <span class="preset-desc">Tabel <code>users</code> (admin/staff) dan <code>karyawan</code> (gaji, NIP, jabatan).</span>
+                                </label>
+
+                                <label class="preset-card">
+                                    <input type="radio" name="presetTemplateKey" value="toko_online" style="display: none;">
+                                    <div class="preset-card-head">
+                                        <span class="preset-icon">🛍️</span>
+                                        <strong>Toko Online (E-Commerce)</strong>
+                                    </div>
+                                    <span class="preset-desc">Tabel <code>customers</code>, <code>products</code>, dan <code>orders</code> belanja.</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 14px;">
+                            <button type="button" id="btnApplyTemplate" class="btn btn-primary" style="width: 100%; justify-content: center;">
+                                <span id="textBtnApplyTemplate">🚀 Buat Skema & Terapkan Template (1-Klik)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="seedAlertResult" class="modal-alert hidden" style="margin-top: 12px;"></div>
                 </div>
 
                 <div class="modal-actions" style="margin-top: 16px;">
@@ -916,6 +1037,6 @@
         </div>
     </div>
 
-    <script src="/app.js?v=1.1.2"></script>
+    <script src="/app.js?v=1.2.0"></script>
 </body>
 </html>
